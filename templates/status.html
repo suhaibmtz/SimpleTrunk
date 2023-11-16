@@ -1,0 +1,11 @@
+{{ template "header" . }}
+{{ if ne .Command "" }}
+<h3>{{.Command}}</h3>
+<form method=post>
+<input type=submit value=Refresh class=btn />
+</form>
+{{end}}
+{{ if ne .Content ""}}
+<pre>{{.Content}}</pre>
+{{end}}
+{{ template "footer" . }}

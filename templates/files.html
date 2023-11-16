@@ -1,0 +1,24 @@
+{{ template "header" . }}
+{{ if .FileList}}
+<a  href='CreateFile' class='linkbutton'> Create New File </a><br><br>
+<table><tr>
+{{ range .Files }}
+<td><a href='Files?file={{.Name}}'>{{.Name}}</a></td>
+{{ if .NewTR}}
+</tr><tr>
+{{end}}
+{{end}}
+</table></tr>
+{{else if ne .FileName ""}}
+<h3>{{.FileName}} <a href='BackupFiles?file={{.FileName}}'>Revisions</a></h3>
+<form method=GET action=EditFile>
+<input type=hidden name=filename value='{{.FileName}}' />
+<input type=submit name=edit value= 'Edit file' class='button' />
+</form>
+Last updated: <font size=-1>{{.LastUpdate}}</font><br/>
+{{ range .Include}}
+<a href='{{.Action}}{{.Line}}'>{{.Line}}</a><br/>
+{{end}}
+<pre>{{.Content}}</pre>
+{{end}}
+{{ template "footer" . }}

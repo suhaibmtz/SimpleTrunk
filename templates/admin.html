@@ -1,0 +1,30 @@
+{{ template "header" . }}
+<h3>Change my password</h3>
+<form method=post>
+<table>
+<tr><td>Old password </td><td><input type=password name=oldpassword
+{{ if ne .OldPass "" }}
+value={{.OldPass}}
+{{end}}
+/></rd></tr>
+<tr><td>New password </td><td><input type=password name=newpassword
+{{ if ne .NewPass "" }}
+value={{.NewPass}}
+{{end}}
+/></td></tr>
+<tr><td>Confirm password </td><td><input type=password name=confirmpassword
+{{ if ne .ConfPass "" }}
+value={{.ConfPass}}
+{{end}}
+/></td></tr>
+<tr><td><input type=submit name=resetpassword value=Change class=button /></td></tr>
+</table></form>
+<hr>
+<a href="Admin?
+{{ if .Reverse}}
+reverse=no" class=btn>Unreverse 
+{{else}}
+reverse=yes" class=btn>Reverse 
+{{end}}
+SIP/Dialplan orders</a>
+{{ template "footer" . }}

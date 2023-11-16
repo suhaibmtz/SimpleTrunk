@@ -1,0 +1,44 @@
+{{ template "header" . }}
+<h2>{{.Page}}</h2>
+<form method=POST>
+<table>
+<tr><td>Index </td>
+<td><input type=number name=index value={{.Count}} /></td></tr>
+<tr><td>Title </td><td><input type=text name=title autofocus
+{{if ne .Title ""}}
+value={{.Title}}
+{{end}}
+/></td></tr>
+<tr><td>Config file name </td>
+<td><input type=text name=file
+{{ if ne .File ""}}
+value={{.File}}
+{{end}}
+/></td></tr>
+<tr><td>SimpleTrunk Agent URL</td>
+<td><input type=text name=url size=30 value='{{.Url}}' /></td></tr>
+<tr><td>AMI User</td>
+<td><input type=text name=amiuser size=30 value='{{.AMIUser}}' /></td></tr>
+<tr><td>AMI Password</td>
+<td><input type=text name=amipass size=30 
+{{ if ne .AMIPass "" }}
+value='{{.AMIPass}}'
+{{end}}
+/></td></tr>
+{{ if ne .RemoteConfig "" }}
+<tr>
+<td>Remote STAgent config</td>
+<td><textarea cols=80 rows=8 name=remoteconfig >{{.RemoteConfig}}</textarea></td>
+</tr>
+{{end}}
+<tr><td><input type=submit name=add value={{.Submit}} class=button /></td></tr>
+{{ if eq .Submit "Update"}}
+<tr><td><font color=red><b>Remove PBX</b></font><br/>
+Enter file name:
+<input type=text name=filetoremove  />
+<input type=submit name=remove value=Remove class=redbutton /></td>
+</tr>
+{{end}}
+</table>
+</form>
+{{ template "footer" . }}

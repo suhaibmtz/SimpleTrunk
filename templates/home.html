@@ -1,0 +1,18 @@
+{{ template "header" . }}
+<h3>Select PBX</h3>
+<a href='AddPBX' class='linkbutton'>Insert new PBX</a>
+<table><tr>
+{{ range .PBXFiles}}
+{{if .IsStc}}
+<td width=20% bgcolor={{.Color}}>
+<b><a href='SelectPBX?pbx={{.FileName}}'>{{.Title}}</a><br/>{{.IP}}</b>
+<br/>{{.FileName}}<br/>
+<font><a style='font-size:80%' href='EditPBX?pbx={{.FileName}}'>Edit</a></font>
+</td>
+{{ if .NewTR}}
+</tr><tr>
+{{end}}
+{{end}}
+{{end}}
+</table>
+{{ template "footer" . }}
