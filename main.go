@@ -20,15 +20,18 @@ func main() {
 	http.HandleFunc("/SimpleTrunk/Logout", Logout)
 
 	http.HandleFunc("/SimpleTrunk/Home", Home)
-	http.HandleFunc("/SimpleTrunk/PBX", PBX)
 	http.HandleFunc("/SimpleTrunk/AddPBX", AddPBX)
 	http.HandleFunc("/SimpleTrunk/EditPBX", EditPBX)
+	http.HandleFunc("/SimpleTrunk/SelectPBX", SelectPBX)
 
 	http.HandleFunc("/SimpleTrunk/Advanced", Advanced)
 	http.HandleFunc("/SimpleTrunk/Status", Status)
+	//files
 	http.HandleFunc("/SimpleTrunk/Files", Files)
+	http.HandleFunc("/SimpleTrunk/BackupFiles", BackupFiles)
+	http.HandleFunc("/SimpleTrunk/CompareFiles", CompareFiles)
 
-	http.HandleFunc("/SimpleTrunk/SelectPBX", SelectPBX)
+	http.HandleFunc("/SimpleTrunk/PBX", PBX)
 
 	http.HandleFunc("/SimpleTrunk/Admin", Admin)
 

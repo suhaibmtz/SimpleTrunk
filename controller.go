@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 )
@@ -43,6 +44,18 @@ func GetPBXFiles() (Files []PBXFileType) {
 		}
 		record.NewTR = i1%5 == 0
 		Files = append(Files, record)
+	}
+	return
+}
+
+func CheckSession(r *http.Request) (exist bool, User UserType) {
+	session, err := r.Cookie("st-session")
+	exist = true
+	if err != nil {
+		exist = false
+		WriteLog("Error in GetSession: " + err.Error())
+	} else {
+		User, exist = CallGetSession(session.Value)
 	}
 	return
 }
@@ -211,9 +224,10 @@ func GetRemoteFile(url, filename string) (text string, Callerr error) {
 	if err != nil {
 		WriteLog("Error in GetRemoteFile marshal obj: " + err.Error())
 	}
-
-	if string(url[len(url)-1]) != "/" {
-		url += "/"
+	if url != "" {
+		if string(url[len(url)-1]) != "/" {
+			url += "/"
+		}
 	}
 	var res []byte
 	res, Callerr = restCallURL(url+"GetFile", data)
@@ -241,15 +255,22 @@ func SavePbx(Data *PBXType) (success bool) {
 		Data.File += ".stc"
 	}
 	Data.File = dir + Data.File
-	success = SetConfigValueTo(Data.File, "url", Data.Url)
-	if success {
-		SetConfigValueTo(Data.File, "index", fmt.Sprint(Data.Count))
-		success = SetConfigValueTo(Data.File, "title", Data.Title)
-		SetConfigValueTo(Data.File, "amiuser", Data.AMIUser)
-		SetConfigValueTo(Data.File, "amipass", Data.AMIPass)
-	} else {
-		Data.Message = "Unable to write configuration"
+	_, err := os.Create(Data.File)
+	if os.IsExist(err) {
+		Data.Message = "Already Exist"
 		Data.MessageType = "errormessage"
+	} else {
+		Data.Url = strings.ReplaceAll(Data.Url, `\`, "")
+		success = SetConfigValueTo(Data.File, "url", Data.Url)
+		if success {
+			SetConfigValueTo(Data.File, "index", fmt.Sprint(Data.Count))
+			success = SetConfigValueTo(Data.File, "title", Data.Title)
+			SetConfigValueTo(Data.File, "amiuser", Data.AMIUser)
+			SetConfigValueTo(Data.File, "amipass", Data.AMIPass)
+		} else {
+			Data.Message = "Unable to write configuration"
+			Data.MessageType = "errormessage"
+		}
 	}
 	return
 }
@@ -314,17 +335,21 @@ func callAMI(pbxfile string, command string) (response ResponseType, Callerr err
 	bytes, err := json.Marshal(obj)
 	if err != nil {
 		WriteLog("Error in callAMI Marshal: " + err.Error())
-	}
-	if string(url[len(url)-1]) != "/" {
-		url += "/"
-	}
-	bytes, Callerr = restCallURL(url+"CallAMI", bytes)
-	if err != nil {
-		WriteLog("Error in callAMI restCallURL: " + Callerr.Error())
-	}
-	err = json.Unmarshal(bytes, &response)
-	if err != nil {
-		WriteLog("Error in callAMI Unmarshal: " + err.Error())
+	} else {
+		if url != "" {
+			if string(url[len(url)-1]) != "/" {
+				url += "/"
+			}
+		}
+		bytes, Callerr = restCallURL(url+"CallAMI", bytes)
+		if Callerr != nil {
+			WriteLog("Error in callAMI restCallURL: " + Callerr.Error())
+		} else {
+			err = json.Unmarshal(bytes, &response)
+			if err != nil {
+				WriteLog("Error in callAMI Unmarshal: " + err.Error())
+			}
+		}
 	}
 	return
 }
@@ -349,8 +374,10 @@ func GetFileData(fileName string, pbxfile string) (File FileDataType, CallErr er
 		}
 
 		url := GetConfigValueFrom(pbxfile, "url", "")
-		if string(url[len(url)-1]) != "/" {
-			url += "/"
+		if url != "" {
+			if string(url[len(url)-1]) != "/" {
+				url += "/"
+			}
 		}
 
 		if fileName == "all" {
@@ -452,6 +479,80 @@ func GetFilesList(url string) (Files []ListFileType, CallErr error) {
 				record.Name = file
 				Files = append(Files, record)
 			}
+		}
+	}
+	return
+}
+
+func GetBackupFilesList(url string, bytes []byte, fileName string) (Files []string, Error error) {
+	bytes, Error = restCallURL(url+"ListFiles", bytes)
+	if Error != nil {
+		WriteLog("Error in GetBackupFilesList restCallURL: " + Error.Error())
+	} else {
+		var response ListFilesType
+		err := json.Unmarshal(bytes, &response)
+		if err != nil {
+			WriteLog("Error in GetBackupFilesList: " + err.Error())
+		} else if response.Success {
+
+			for _, file := range response.Files {
+				originalFileName := file[0 : strings.Index(file, "conf")+4]
+				if fileName == originalFileName {
+					Files = append(Files, file)
+				}
+			}
+		} else {
+			Error = errors.New(response.Message)
+		}
+	}
+	return
+}
+
+func doRetrieve(r *http.Request, fileName string, url string) {
+	if r.FormValue("retrieve") != "" {
+		// saveobj = JSONObject();
+		// saveobj.put("filename", fileName);
+		// saveobj.put("content", request.getParameter("content"));
+		// String requestText = saveobj.toJSONString();
+		// String resultText = General.restCallURL(url + "ModifyFile", requestText);
+		// JSONParser saveparser = new JSONParser();
+		// JSONObject saveresObj = (JSONObject) saveparser.parse(resultText);
+		// boolean res = (Boolean.valueOf(saveresObj.get("success").toString()));
+		// if (res) {
+		//     out.println("<p class=infomessage>File Replaced</p>");
+		//     out.println("<a href='Files?file=" + fileName + "'>View (Read only)</a>");
+		//     Web.displayReloadLink(fileName, out);
+		// }
+		// else {
+		//     out.println("<p class=errormessage>Error: " + saveresObj.get("message").toString() + "</p>");
+		// }
+
+	}
+}
+
+type BackupFileContentType struct {
+	FileTime string
+	Content  string
+}
+
+func GetBackupFileContents(url string, bytes []byte, originalFileName string, backupFileName string) (Data BackupFileContentType, Error error) {
+	bytes, Error = restCallURL(url+"GetFile", bytes)
+	var Response GetFileResponseType
+	err := json.Unmarshal(bytes, &Response)
+	if err != nil {
+		WriteLog("Error in GetBackupFileContents Unmarshal: " + err.Error())
+	} else {
+		if Response.Success {
+			if strings.Contains(Response.Filetime, ".") || strings.Contains(Response.Filetime, "+") {
+				terminateAt := "."
+				if !strings.Contains(Response.Filetime, ".") {
+					terminateAt = "+"
+				}
+				Data.FileTime = Response.Filetime[0:strings.Index(Response.Filetime, terminateAt)]
+			}
+			Data.Content = Response.Content
+		} else {
+			Error = errors.New(Response.Message)
 		}
 	}
 	return
