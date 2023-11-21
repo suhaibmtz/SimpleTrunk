@@ -44,6 +44,7 @@ type ResponseType struct {
 	Success   bool   `json:"success"`
 	Errorcode int    `json:"errorcode"`
 	Message   string `json:"message"`
+	Result    string `json:"result"`
 }
 
 type GetFileResponseType struct {

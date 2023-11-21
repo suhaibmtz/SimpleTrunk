@@ -15,12 +15,12 @@
 <h3>{{.FileName}}</h3>
 <form method=POST action=CompareFiles  >
 <input type=hidden name=backupfilename value={{.FileName}} />
-<input type=hidden name=originalfilename value='{{.FileName}}' /> 
+<input type=hidden name=originalfilename value='{{.OrignalFile}}' /> 
 <input type=submit name=CompareFiles value= 'Compare to {{.OrignalFile}}' /> <br/>
 </form>
 <form method=POST  >
 <input type=hidden name=backupfilename value='{{.FileName}}' />
-<input type=hidden name=originalfilename value='{{.FileName}}' />
+<input type=hidden name=originalfilename value='{{.OrignalFile}}' />
 <input type=submit name=retrieve value= 'Retrieve Backup File' /> <br/> 
 {{ if ne .FileTime "" }}
 Last updated: <font size=-1>{{.FileTime}}</font><br/>
