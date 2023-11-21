@@ -1,0 +1,31 @@
+{{ template "header" . }}
+<br>
+<h2>Files</h2>
+{{ if .ListFiles}}
+<!--list Files-->
+<h3>{{.FileName}} Revisions Backup files</h3>
+<table><tr>
+{{range .Files}}
+<td><a href='BackupFiles?backupfile={{.}}'>{{.}}</a></td>
+</tr><tr>
+{{end}}
+</tr></table>
+{{else}}
+<!--show backup file-->
+<h3>{{.FileName}}</h3>
+<form method=POST action=CompareFiles  >
+<input type=hidden name=backupfilename value={{.FileName}} />
+<input type=hidden name=originalfilename value='{{.FileName}}' /> 
+<input type=submit name=CompareFiles value= 'Compare to {{.OrignalFile}}' /> <br/>
+</form>
+<form method=POST  >
+<input type=hidden name=backupfilename value='{{.FileName}}' />
+<input type=hidden name=originalfilename value='{{.FileName}}' />
+<input type=submit name=retrieve value= 'Retrieve Backup File' /> <br/> 
+{{ if ne .FileTime "" }}
+Last updated: <font size=-1>{{.FileTime}}</font><br/>
+{{end}}
+<textarea  readonly cols=140 rows = 60 font name=content >{{.Content}}</textarea><br/>
+</form>
+{{end}}
+{{ template "footer" . }}
