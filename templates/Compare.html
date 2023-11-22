@@ -1,3 +1,18 @@
+{{ define "line" }}
+<tr>
+<td>{{.LineN}}</td>
+<td
+{{ if ne .Color "" }}
+bgcolor='{{.Color}}'
+{{end}}
+>{{.Line}}
+{{ if ne .Span "" }}
+<span style='color:{{.SpanColor}}'>{{.Span}}</span>
+{{end}}
+</td>
+</tr>
+{{end}}
+
 {{ template "header" . }}
 <br><br><br>
 <div style=' margin:auto; overflow:hidden;' >
@@ -6,14 +21,7 @@
 <tr> <th> </th>
 <th> <h3>{{.Original}}</h3></th> </tr>
 {{ range .OrgLines}}
-<tr>
-<td>{{.LineN}}</td>
-<td
-{{ if ne .Color "" }}
-bgcolor='{{.Color}}'
-{{end}}
->{{.Line}}</td>
-</tr>
+{{ template "line" . }}
 {{end}}
 </tbody>
 </table>
@@ -22,14 +30,7 @@ bgcolor='{{.Color}}'
 <tr><th></th>
 <th><h3>{{.BackUp}}</h3></th></tr>
 {{ range .BackUpLines}}
-<tr>
-<td>{{.LineN}}</td>
-<td
-{{ if ne .Color "" }}
-bgcolor='{{.Color}}'
-{{end}}
->{{.Line}}</td>
-</tr>
+{{ template "line" . }}
 {{end}}
 </tbody>
 </table>

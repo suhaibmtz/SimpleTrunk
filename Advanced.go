@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"net/url"
 	"strings"
@@ -228,9 +227,11 @@ func BackupFiles(w http.ResponseWriter, r *http.Request) {
 }
 
 type LineType struct {
-	LineN int
-	Line  string
-	Color string
+	LineN     int
+	Line      string
+	Color     string
+	Span      string
+	SpanColor string
 }
 
 type CompareFilesType struct {
@@ -296,7 +297,7 @@ func CompareFiles(w http.ResponseWriter, r *http.Request) {
 					dpArr := diff(res)
 					Data.Original = originalFileName
 					Data.BackUp = backupFileName
-					Data.OrgLines, Data.BackUpLines = displayCompareFile(Org, Back, originalFileName, backupFileName, dpArr)
+					Data.OrgLines, Data.BackUpLines = CompareFile(Org, Back, originalFileName, backupFileName, dpArr)
 				}
 			} else {
 				http.Redirect(w, r, "Files", http.StatusTemporaryRedirect)
@@ -311,163 +312,4 @@ func CompareFiles(w http.ResponseWriter, r *http.Request) {
 	} else {
 		http.Redirect(w, r, "login", http.StatusTemporaryRedirect)
 	}
-}
-
-/*private DiffPosition extractLineNumbers(String token ){
-
-    DiffPosition  dp = new DiffPosition();
-
-    if (token.contains("a")){
-        dp.type = 'a';
-    }else if(token.contains("d")){
-        dp.type = 'd';
-    }else if (token.contains("c")){
-        dp.type = 'c';
-    }
-
-    String [] linesNumber = token.split("[a|d|c]");
-
-    String [] firstFileLines = linesNumber[0].split(",");
-    dp.firstFileStartPos = Integer.valueOf(firstFileLines[0]);
-    if(firstFileLines.length>=2){
-        dp.firstFileEndPos = Integer.valueOf(firstFileLines[1]);
-
-    }else {
-        dp.firstFileEndPos = Integer.valueOf(firstFileLines[0]);
-    }
-
-
-    String [] SecondFileLines = linesNumber[1].split(",");
-    dp.secondFileStartPos = Integer.valueOf(SecondFileLines[0]);
-    if(SecondFileLines.length>=2){
-        dp.secondFileEndPos = Integer.valueOf(SecondFileLines[1]);
-
-    }else {
-        dp.secondFileEndPos = Integer.valueOf(SecondFileLines[0]);
-    }
-
-    return dp ;
-}*/
-
-func diff(res ResponseType) (dpArr []DiffPosition) {
-	token := strings.Split(res.Result, "\n")
-
-	count := 0
-	diffToken := ""
-	for i := 0; i > len(token); i++ {
-		diffToken = token[i]
-		if diffToken[0] != '>' && diffToken[0] != '<' && diffToken[0] != '-' {
-			//dpArr = append(dpArr, extractLineNumbers(diffToken))
-		}
-
-		count++
-	}
-	return
-}
-
-func displayCompareFile(Org, Backup FileDataType, originalFileName, backupFileName string, dpArr []DiffPosition) (OrgLines []LineType, BackUpLines []LineType) {
-
-	originalContent := Org.Content
-	backupContent := Backup.Content
-
-	originalContentArr := strings.Split(originalContent, "\n")
-	backupContentArr := strings.Split(backupContent, "\n")
-	fmt.Sprint(originalContentArr, backupContentArr)
-	originCount := 0
-	for i := 0; i < len(originalContentArr); i++ {
-		var Line LineType
-		Line.LineN = i + 1
-		if i >= len(originalContentArr) {
-			Line.Line = "\t"
-		} else {
-			if len(dpArr) == 0 {
-				Line.Line = originalContentArr[i]
-			} else {
-				if dpArr[originCount].SecondFileEndPos <= 0 {
-					originCount++
-				}
-				startPoint := dpArr[originCount].SecondFileStartPos - 1
-				endPoint := dpArr[originCount].SecondFileEndPos
-				if startPoint == i {
-					for startPoint < endPoint {
-						Line.Line = originalContentArr[i]
-						switch dpArr[originCount].Type {
-						case "a":
-							Line.Color = "#B4FFB4"
-							break
-						case "d":
-							Line.Line += "<span style='color:#ff3658 ;'> ▼</span>"
-							break
-						case "c":
-							Line.Color = "#A0C8FF"
-							break
-						}
-						startPoint++
-						if startPoint < endPoint {
-							i++
-						}
-
-					}
-					if originCount < len(dpArr)-1 {
-						originCount++
-					}
-
-				} else {
-					Line.Line = originalContentArr[i]
-				}
-
-			}
-
-		}
-		OrgLines = append(OrgLines, Line)
-	}
-	backupCount := 0
-	for i := 0; i < len(backupContentArr); i++ {
-		var Line LineType
-		Line.LineN = i + 1
-		if i >= len(backupContentArr) {
-			Line.Line = "\t"
-		} else {
-			if len(dpArr) == 0 {
-				Line.Line = backupContentArr[i]
-			} else {
-				if dpArr[backupCount].FirstFileEndPos <= 0 {
-					backupCount++
-				}
-				startpoint := dpArr[backupCount].FirstFileStartPos - 1
-				endPoint := dpArr[backupCount].FirstFileEndPos
-				if startpoint == i {
-					for startpoint < endPoint {
-						Line.Line = backupContentArr[i]
-						switch dpArr[backupCount].Type {
-						case "a":
-							Line.Line += "<span style='color:#02a322 ;'> ▼</span>"
-							break
-						case "d":
-							Line.Color = "#FFA0B4"
-							break
-						case "c":
-							Line.Color = "#A0C8FF"
-							break
-
-						}
-
-						startpoint++
-						if startpoint < endPoint {
-							i++
-						}
-
-					}
-					if backupCount < len(dpArr)-1 {
-						backupCount++
-					}
-
-				} else {
-					Line.Line = backupContentArr[i]
-				}
-			}
-		}
-		BackUpLines = append(BackUpLines, Line)
-	}
-	return
 }

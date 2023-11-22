@@ -557,3 +557,183 @@ func GetBackupFileContents(url string, bytes []byte, originalFileName string, ba
 	}
 	return
 }
+
+func SplitAny(s string, seps string) []string {
+	splitter := func(r rune) bool {
+		return strings.ContainsRune(seps, r)
+	}
+	return strings.FieldsFunc(s, splitter)
+}
+
+func extractLineNumbers(token string) (dp DiffPosition) {
+
+	if strings.Contains(token, "a") {
+		dp.Type = "a"
+	} else if strings.Contains(token, "d") {
+		dp.Type = "d"
+	} else if strings.Contains(token, "c") {
+		dp.Type = "c"
+	}
+
+	linesNumber := SplitAny(token, "abc")
+	if len(linesNumber) > 1 {
+		firstFileLines := strings.Split(linesNumber[0], ",")
+		dp.FirstFileStartPos, _ = strconv.Atoi(firstFileLines[0])
+		if len(firstFileLines) >= 2 {
+			dp.FirstFileEndPos, _ = strconv.Atoi(firstFileLines[1])
+
+		} else {
+			dp.FirstFileEndPos, _ = strconv.Atoi(firstFileLines[0])
+		}
+
+		SecondFileLines := strings.Split(linesNumber[1], ",")
+		var err error
+		dp.SecondFileStartPos, err = strconv.Atoi(SecondFileLines[0])
+		if err != nil {
+			WriteLog("Error in extractLineNumbers start: " + err.Error())
+		}
+		if len(SecondFileLines) >= 2 {
+			dp.SecondFileEndPos, err = strconv.Atoi(SecondFileLines[1])
+
+		} else {
+			dp.SecondFileEndPos, err = strconv.Atoi(SecondFileLines[0])
+		}
+		if err != nil {
+			WriteLog("Error in extractLineNumbers end: " + err.Error())
+		}
+	}
+
+	return dp
+}
+
+func diff(res ResponseType) (dpArr []DiffPosition) {
+	token := strings.Split(res.Result, "\n")
+
+	count := 0
+	diffToken := ""
+	for i := 0; i < len(token); i++ {
+		diffToken = token[i]
+		if len(diffToken) > 0 {
+			if diffToken[0] != '>' && diffToken[0] != '<' && diffToken[0] != '-' {
+				dpArr = append(dpArr, extractLineNumbers(diffToken))
+			}
+		}
+
+		count++
+	}
+	return
+}
+
+func CompareFile(Org, Backup FileDataType, originalFileName, backupFileName string, dpArr []DiffPosition) (OrgLines []LineType, BackUpLines []LineType) {
+
+	originalContent := Org.Content
+	backupContent := Backup.Content
+
+	originalContentArr := strings.Split(originalContent, "\n")
+	backupContentArr := strings.Split(backupContent, "\n")
+	originCount := 0
+	for i := 0; i < len(originalContentArr); i++ {
+		var Line LineType
+		Line.LineN = i + 1
+		if i >= len(originalContentArr) {
+			Line.Line = "\t"
+		} else {
+			if len(dpArr) == 0 {
+				Line.Line = originalContentArr[i]
+			} else {
+				if dpArr[originCount].SecondFileEndPos <= 0 {
+					originCount++
+				}
+				var startPoint, endPoint int
+				if len(dpArr) > originCount {
+					startPoint = dpArr[originCount].SecondFileStartPos - 1
+					endPoint = dpArr[originCount].SecondFileEndPos
+				}
+				if startPoint == i {
+					for startPoint < endPoint {
+						Line.Line = originalContentArr[i]
+						switch dpArr[originCount].Type {
+						case "a":
+							Line.Color = "#B4FFB4"
+							break
+						case "d":
+							Line.Span = " ▼"
+							Line.SpanColor = "#ff3658"
+							break
+						case "c":
+							Line.Color = "#A0C8FF"
+							break
+						}
+						startPoint++
+						if startPoint < endPoint {
+							i++
+						}
+
+					}
+					if originCount < len(dpArr)-1 {
+						originCount++
+					}
+
+				} else {
+					Line.Line = originalContentArr[i]
+				}
+
+			}
+
+		}
+		OrgLines = append(OrgLines, Line)
+	}
+	backupCount := 0
+	for i := 0; i < len(backupContentArr); i++ {
+		var Line LineType
+		Line.LineN = i + 1
+		if i >= len(backupContentArr) {
+			Line.Line = "\t"
+		} else {
+			if len(dpArr) == 0 {
+				Line.Line = backupContentArr[i]
+			} else {
+				if dpArr[backupCount].FirstFileEndPos <= 0 {
+					backupCount++
+				}
+				var startpoint, endPoint int
+				if len(dpArr) > backupCount {
+					startpoint = dpArr[backupCount].SecondFileStartPos - 1
+					endPoint = dpArr[backupCount].SecondFileEndPos
+				}
+				if startpoint == i {
+					for startpoint < endPoint {
+						Line.Line = backupContentArr[i]
+						switch dpArr[backupCount].Type {
+						case "a":
+							Line.Span = " ▼"
+							Line.SpanColor = "#02a322"
+							break
+						case "d":
+							Line.Color = "#FFA0B4"
+							break
+						case "c":
+							Line.Color = "#A0C8FF"
+							break
+
+						}
+
+						startpoint++
+						if startpoint < endPoint {
+							i++
+						}
+
+					}
+					if backupCount < len(dpArr)-1 {
+						backupCount++
+					}
+
+				} else {
+					Line.Line = backupContentArr[i]
+				}
+			}
+		}
+		BackUpLines = append(BackUpLines, Line)
+	}
+	return
+}
