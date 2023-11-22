@@ -1,0 +1,37 @@
+{{ template "header" . }}
+<br><br><br>
+<div style=' margin:auto; overflow:hidden;' >
+<table width='50%' style='float: left; display: block;' >
+<tbody>
+<tr> <th> </th>
+<th> <h3>{{.Original}}</h3></th> </tr>
+{{ range .OrgLines}}
+<tr>
+<td>{{.LineN}}</td>
+<td
+{{ if ne .Color "" }}
+bgcolor='{{.Color}}'
+{{end}}
+>{{.Line}}</td>
+</tr>
+{{end}}
+</tbody>
+</table>
+<table width='50%'; style='float: left; display: block';>
+<tbody>
+<tr><th></th>
+<th><h3>{{.BackUp}}</h3></th></tr>
+{{ range .BackUpLines}}
+<tr>
+<td>{{.LineN}}</td>
+<td
+{{ if ne .Color "" }}
+bgcolor='{{.Color}}'
+{{end}}
+>{{.Line}}</td>
+</tr>
+{{end}}
+</tbody>
+</table>
+</div> <br>
+{{ template "footer" . }}

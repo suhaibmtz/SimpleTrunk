@@ -230,6 +230,7 @@ func BackupFiles(w http.ResponseWriter, r *http.Request) {
 type LineType struct {
 	LineN int
 	Line  string
+	Color string
 }
 
 type CompareFilesType struct {
@@ -292,7 +293,9 @@ func CompareFiles(w http.ResponseWriter, r *http.Request) {
 					if err != nil {
 						WriteLog("Error in CompareFiles Unmarshal Response: " + err.Error())
 					}
-					dpArr := []DiffPosition{} // diff(out, diffObject)
+					dpArr := diff(res)
+					Data.Original = originalFileName
+					Data.BackUp = backupFileName
 					Data.OrgLines, Data.BackUpLines = displayCompareFile(Org, Back, originalFileName, backupFileName, dpArr)
 				}
 			} else {
@@ -310,152 +313,161 @@ func CompareFiles(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func displayCompareFile(Org, Backup FileDataType, originalFileName, backupFileName string, dpar []DiffPosition) (OrgLines []LineType, BackUpLines []LineType) {
+/*private DiffPosition extractLineNumbers(String token ){
+
+    DiffPosition  dp = new DiffPosition();
+
+    if (token.contains("a")){
+        dp.type = 'a';
+    }else if(token.contains("d")){
+        dp.type = 'd';
+    }else if (token.contains("c")){
+        dp.type = 'c';
+    }
+
+    String [] linesNumber = token.split("[a|d|c]");
+
+    String [] firstFileLines = linesNumber[0].split(",");
+    dp.firstFileStartPos = Integer.valueOf(firstFileLines[0]);
+    if(firstFileLines.length>=2){
+        dp.firstFileEndPos = Integer.valueOf(firstFileLines[1]);
+
+    }else {
+        dp.firstFileEndPos = Integer.valueOf(firstFileLines[0]);
+    }
+
+
+    String [] SecondFileLines = linesNumber[1].split(",");
+    dp.secondFileStartPos = Integer.valueOf(SecondFileLines[0]);
+    if(SecondFileLines.length>=2){
+        dp.secondFileEndPos = Integer.valueOf(SecondFileLines[1]);
+
+    }else {
+        dp.secondFileEndPos = Integer.valueOf(SecondFileLines[0]);
+    }
+
+    return dp ;
+}*/
+
+func diff(res ResponseType) (dpArr []DiffPosition) {
+	token := strings.Split(res.Result, "\n")
+
+	count := 0
+	diffToken := ""
+	for i := 0; i > len(token); i++ {
+		diffToken = token[i]
+		if diffToken[0] != '>' && diffToken[0] != '<' && diffToken[0] != '-' {
+			//dpArr = append(dpArr, extractLineNumbers(diffToken))
+		}
+
+		count++
+	}
+	return
+}
+
+func displayCompareFile(Org, Backup FileDataType, originalFileName, backupFileName string, dpArr []DiffPosition) (OrgLines []LineType, BackUpLines []LineType) {
 
 	originalContent := Org.Content
 	backupContent := Backup.Content
 
-	originalContentArr := strings.SplitN(originalContent, "\\r?\\n", -1)
-	backupContentArr := strings.SplitN(backupContent, "\\r?\\n", -1)
+	originalContentArr := strings.Split(originalContent, "\n")
+	backupContentArr := strings.Split(backupContent, "\n")
 	fmt.Sprint(originalContentArr, backupContentArr)
-	// originCount := 0
+	originCount := 0
 	for i := 0; i < len(originalContentArr); i++ {
 		var Line LineType
+		Line.LineN = i + 1
 		if i >= len(originalContentArr) {
-			Line.LineN = i + 1
 			Line.Line = "\t"
 		} else {
+			if len(dpArr) == 0 {
+				Line.Line = originalContentArr[i]
+			} else {
+				if dpArr[originCount].SecondFileEndPos <= 0 {
+					originCount++
+				}
+				startPoint := dpArr[originCount].SecondFileStartPos - 1
+				endPoint := dpArr[originCount].SecondFileEndPos
+				if startPoint == i {
+					for startPoint < endPoint {
+						Line.Line = originalContentArr[i]
+						switch dpArr[originCount].Type {
+						case "a":
+							Line.Color = "#B4FFB4"
+							break
+						case "d":
+							Line.Line += "<span style='color:#ff3658 ;'> ▼</span>"
+							break
+						case "c":
+							Line.Color = "#A0C8FF"
+							break
+						}
+						startPoint++
+						if startPoint < endPoint {
+							i++
+						}
+
+					}
+					if originCount < len(dpArr)-1 {
+						originCount++
+					}
+
+				} else {
+					Line.Line = originalContentArr[i]
+				}
+
+			}
+
 		}
 		OrgLines = append(OrgLines, Line)
-	} /*
-					                        if (dpArr.size() == 0 ){
+	}
+	backupCount := 0
+	for i := 0; i < len(backupContentArr); i++ {
+		var Line LineType
+		Line.LineN = i + 1
+		if i >= len(backupContentArr) {
+			Line.Line = "\t"
+		} else {
+			if len(dpArr) == 0 {
+				Line.Line = backupContentArr[i]
+			} else {
+				if dpArr[backupCount].FirstFileEndPos <= 0 {
+					backupCount++
+				}
+				startpoint := dpArr[backupCount].FirstFileStartPos - 1
+				endPoint := dpArr[backupCount].FirstFileEndPos
+				if startpoint == i {
+					for startpoint < endPoint {
+						Line.Line = backupContentArr[i]
+						switch dpArr[backupCount].Type {
+						case "a":
+							Line.Line += "<span style='color:#02a322 ;'> ▼</span>"
+							break
+						case "d":
+							Line.Color = "#FFA0B4"
+							break
+						case "c":
+							Line.Color = "#A0C8FF"
+							break
 
-					                            out.println("<tr>");
-					                            out.println("<td>"+(i+1) +"</td>");
-					                            out.println("<td>"+originalContentArr[i] +" </td>");
-					                            out.println("</tr>");
-					                        }else{
-					                            if (dpArr.get(originCount).secondFileEndPos  <= 0){
-					                                originCount++ ;
-					                            }
-					                            int startPoint = dpArr.get(originCount).secondFileStartPos -1  ;
-					                            int endPoint = dpArr.get(originCount).secondFileEndPos    ;
-					                            if (startPoint == i ){
-					                                while (startPoint < endPoint ){
-					                                    out.println("<tr>");
-					                                    out.println("<td>"+(i+1) +"</td>");
-					                                    switch(dpArr.get(originCount).type){
-					                                        case 'a':
-					                                            out.println("<td bgcolor='#B4FFB4'>"+originalContentArr[i] +" </td>");
-					                                            break ;
-					                                        case 'd':
-					                                            //out.println("<td bgcolor='#FFA0B4'>"+originalContentArr[i] +" </td>");
-					                                            out.println("<td>"+originalContentArr[i] +"<span style='color:#ff3658 ;'> ▼</span>  </td>");
-					                                            break ;
-					                                        case 'c':
-					                                            out.println("<td bgcolor='#A0C8FF'>"+originalContentArr[i] +" </td>");
-					                                            break ;
-					                                   }
+						}
 
-					                                    out.println("</tr>");
-					                                    startPoint++ ;
-					                                   if (startPoint < endPoint){
-					                                       i++ ;
-					                                   }
+						startpoint++
+						if startpoint < endPoint {
+							i++
+						}
 
-					                                }
-					                                if (originCount < dpArr.size()-1 ){
-					                                     originCount++ ;
-					                                }
+					}
+					if backupCount < len(dpArr)-1 {
+						backupCount++
+					}
 
-					                           }else{
-					                               out.println("<tr>");
-					                               out.println("<td>"+(i+1) +"</td>");
-					                               out.println("<td>"+originalContentArr[i] +" </td>");
-					                               out.println("</tr>");
-					                           }
-
-
-					                        }
-
-
-					                     }
-										OrgLines = append(OrgLines,record)
-					                }
-
-
-					        out.println("</tbody>");
-					        out.println("</table>");
-
-
-					                    /////////////////////////////////////////////////////
-
-
-
-					    out.println("<table width='50%'; style='float: left; display: block';>");
-					        out.println("<tbody>");
-					            out.println("<tr> <th>  </th> ");
-					            out.println(" <th> <h3>"+backupFileName+"</h3></th> </tr>");
-					                int backupCount = 0 ;
-					                for (int i = 0;i< backupContentArr.length ; i++ ){
-
-					                    if(i  >= backupContentArr.length){
-					                        out.println("<tr>");
-					                        out.println("<td>"+(i+1) +"</td>");
-					                        out.println("<td>  \t </td>");
-					                        out.println("</tr>");
-					                    }else{
-					                        if (dpArr.size() == 0 ){
-
-					                            out.println("<tr>");
-					                            out.println("<td>"+(i+1) +"</td>");
-					                            out.println("<td>"+backupContentArr[i] +" </td>");
-					                            out.println("</tr>");
-					                        }else{
-					                           if (dpArr.get(backupCount).firstFileEndPos  <= 0){
-					                                backupCount++ ;
-					                            }
-					                            int startpoint = dpArr.get(backupCount).firstFileStartPos -1  ;
-					                            int endPoint = dpArr.get(backupCount).firstFileEndPos   ;
-					                            if (startpoint== i ){
-					                                while (startpoint < endPoint){
-					                                   out.println("<tr>");
-					                                   out.println("<td>"+(i+1) +"</td>");
-					                                   switch(dpArr.get(backupCount).type){
-					                                        case 'a':
-					                                            //out.println("<td bgcolor='#B4FFB4'>"+backupContentArr[i] +" </td>");
-					                                            out.println("<td>"+backupContentArr[i] +"<span style='color:#02a322 ;'> ▼</span>  </td>");
-					                                            break ;
-					                                        case 'd':
-					                                            out.println("<td bgcolor='#FFA0B4'>"+backupContentArr[i] +" </td>");
-					                                            break ;
-					                                        case 'c':
-					                                            out.println("<td bgcolor='#A0C8FF'>"+backupContentArr[i] +" </td>");
-					                                            break ;
-
-					                                   }
-
-					                                   out.println("</tr>");
-					                                   startpoint++ ;
-					                                   if (startpoint < endPoint){
-					                                       i++ ;
-					                                   }
-
-					                                }
-					                               if (backupCount < dpArr.size()-1){
-					                                   backupCount++ ;
-					                               }
-
-
-					                            }else{
-					                               out.println("<tr>");
-					                               out.println("<td>"+(i+1) +"</td>");
-					                               out.println("<td>"+backupContentArr[i] +" </td>");
-					                               out.println("</tr>");
-					                            }
-					                        }
+				} else {
+					Line.Line = backupContentArr[i]
+				}
 			}
 		}
-	*/
+		BackUpLines = append(BackUpLines, Line)
+	}
 	return
 }
