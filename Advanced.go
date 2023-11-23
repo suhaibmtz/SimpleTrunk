@@ -7,6 +7,18 @@ import (
 	"strings"
 )
 
+var AdvancedTabs = []TabType{
+	{Value: "Status", Name: "Status"},
+	{Value: "Files", Name: "Files"},
+	{Value: "SIPNodes", Name: "SIP"},
+	{Value: "Dialplan", Name: "Dial plans"},
+	{Value: "Commands", Name: "CLI commands"},
+	{Value: "AMI", Name: "AMI commands"},
+	{Value: "Terminal", Name: "Terminal"},
+	{Value: "Logs", Name: "Logs"},
+	{Value: "Config", Name: "Configuration"},
+}
+
 func GetAdvancedHeader(name, page, page2 string, r *http.Request) (Data HeaderType) {
 	Data = GetHeader(name, "Advanced", r)
 	AdvancedTabs := TabsType{Selected: page, Tabs: AdvancedTabs}
@@ -40,6 +52,8 @@ func GetAdvancedHeader(name, page, page2 string, r *http.Request) (Data HeaderTy
 				{Value: "?file=all", Name: "All Files"},
 			},
 		}
+	case "EditFile":
+		Data.Tabs[0].Selected = "Files"
 	}
 	if Tabs.Text != "" {
 		Data.Tabs = append(Data.Tabs, Tabs)
@@ -200,7 +214,17 @@ func BackupFiles(w http.ResponseWriter, r *http.Request) {
 			} else if backupFileName != "" {
 				Data.FileName = backupFileName
 				Data.OrignalFile = backupFileName[0 : strings.Index(backupFileName, "conf")+4]
-				doRetrieve(r, Data.OrignalFile, AgentUrl)
+				err, ret := doRetrieve(r, Data.OrignalFile, AgentUrl)
+				if ret {
+					if err == nil {
+						WriteLog(User.Name + " Retrieved: " + Data.OrignalFile + " from " + backupFileName)
+						Data.Message = "File Replaced"
+						Data.MessageType = "infomessage"
+					} else {
+						Data.Message = err.Error()
+						Data.MessageType = "errormessage"
+					}
+				}
 				obj["filename"] = "/etc/asterisk/backup/" + backupFileName
 				bytes, err := json.Marshal(obj)
 				if err != nil {
@@ -265,22 +289,16 @@ func CompareFiles(w http.ResponseWriter, r *http.Request) {
 			backupFileName := r.FormValue("backupfilename")
 			if r.FormValue("CompareFiles") != "" && originalFileName != "" && backupFileName != "" {
 				url := GetConfigValueFrom(pbxfile, "url", "")
-				var obj = map[string]string{}
-
-				obj["filename"] = "/etc/asterisk/" + originalFileName
-				bytes, _ := json.Marshal(obj)
-				Org, err := GetFileContents(url, obj["filename"], bytes)
+				Org, err := GetFileContents(url, "/etc/asterisk/"+originalFileName)
 				if err != nil {
 					WriteLog("Error in CompareFiles GetFileContent Original: " + err.Error())
 				}
-				obj["filename"] = "/etc/asterisk/backup/" + backupFileName
-				bytes, _ = json.Marshal(obj)
-
-				Back, _ := GetFileContents(url, obj["filename"], bytes)
+				Back, _ := GetFileContents(url, "/etc/asterisk/backup/"+backupFileName)
 
 				command := "diff -w -b " + "/etc/asterisk/backup/" + backupFileName + "  /etc/asterisk/" + originalFileName
+				obj := make(map[string]string)
 				obj["command"] = command
-				bytes, err = json.Marshal(obj)
+				bytes, err := json.Marshal(obj)
 				if err != nil {
 					WriteLog("Error in CompareFiles marshal diff object: " + err.Error())
 				} else {
@@ -308,6 +326,55 @@ func CompareFiles(w http.ResponseWriter, r *http.Request) {
 			}
 		} else {
 			http.Redirect(w, r, "Home", http.StatusTemporaryRedirect)
+		}
+	} else {
+		http.Redirect(w, r, "login", http.StatusTemporaryRedirect)
+	}
+}
+
+type EditFileType struct {
+	HeaderType
+	FileName string
+	Content  string
+}
+
+func EditFile(w http.ResponseWriter, r *http.Request) {
+	exist, User := CheckSession(r)
+	if exist {
+		pbxfile := GetPBXDir() + GetCookieValue(r, "file")
+		if FileExist(pbxfile) {
+			var Data EditFileType
+			Data.HeaderType = GetAdvancedHeader(User.Name, "EditFile", "", r)
+			Data.FileName = r.FormValue("filename")
+			AgentUrl := GetConfigValueFrom(pbxfile, "url", "")
+			Response, err := GetFile(AgentUrl, Data.FileName)
+			if err == nil {
+				Data.Content = Response.Content
+			} else {
+				Data.Message = err.Error()
+				Data.MessageType = "errormessage"
+			}
+			if r.FormValue("save") != "" {
+				res, err := SaveRemoteFile(AgentUrl, Data.FileName, r.FormValue("content"))
+				if err == nil {
+					if res.Success {
+						Data.Message = "File Saved"
+						Data.MessageType = "infomessage"
+					} else {
+						Data.Message = "Error: " + err.Error()
+						Data.MessageType = "errormessage"
+					}
+				} else {
+					Data.Message = err.Error()
+					Data.MessageType = "errormessage"
+				}
+			}
+			err = mytemplate.ExecuteTemplate(w, "EditFile.html", Data)
+			if err != nil {
+				WriteLog("Error in EditFile execute template: " + err.Error())
+			}
+		} else {
+			http.Redirect(w, r, "Files", http.StatusTemporaryRedirect)
 		}
 	} else {
 		http.Redirect(w, r, "login", http.StatusTemporaryRedirect)

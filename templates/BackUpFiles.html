@@ -13,6 +13,7 @@
 {{else}}
 <!--show backup file-->
 <h3>{{.FileName}}</h3>
+<a href="Files?file=asterisk.conf">View (Read only)</a>
 <form method=POST action=CompareFiles  >
 <input type=hidden name=backupfilename value={{.FileName}} />
 <input type=hidden name=originalfilename value='{{.OrignalFile}}' /> 

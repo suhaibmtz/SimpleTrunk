@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"os"
 	"strconv"
 	"strings"
 )
@@ -216,34 +215,51 @@ func CallSetSession(key string, id int) {
 	}
 }
 
-func GetRemoteFile(url, filename string) (text string, Callerr error) {
-
-	var obj = map[string]string{}
-	obj["filename"] = "/etc/simpletrunk/stagent.ini"
-	data, err := json.Marshal(obj)
-	if err != nil {
-		WriteLog("Error in GetRemoteFile marshal obj: " + err.Error())
-	}
+func GetFile(url, filename string) (response GetFileResponseType, err error) {
+	obj := make(map[string]string)
+	obj["filename"] = filename
+	data, _ := json.Marshal(obj)
 	if url != "" {
 		if string(url[len(url)-1]) != "/" {
 			url += "/"
 		}
 	}
-	var res []byte
-	res, Callerr = restCallURL(url+"GetFile", data)
-	if Callerr != nil {
-		WriteLog("Error in GetRemoteFile restCallURL: " + Callerr.Error())
+	var bytes []byte
+	bytes, err = restCallURL(url+"GetFile", data)
+	if err == nil {
+		err = json.Unmarshal(bytes, &response)
+		if response.Success {
+			// Display last updated time
+			if response.Filetime != "" {
+				FileTimeDot := strings.Contains(response.Filetime, ".")
+				if FileTimeDot || strings.Contains(response.Filetime, "+") {
+					terminateAt := "."
+					if !FileTimeDot {
+						terminateAt = "+"
+					}
+					response.Filetime = response.Filetime[0:strings.Index(response.Filetime, terminateAt)]
+				}
+			}
+
+		} else {
+			err = errors.New(response.Message)
+		}
 	}
+	return
+}
+
+func GetRemoteFile(url string) (text string, err error) {
 
 	var Response GetFileResponseType
-	err = json.Unmarshal(res, &Response)
+	Response, err = GetFile(url, "/etc/simpletrunk/stagent.ini")
 	if err != nil {
-		WriteLog("Error in GetRemoteFile Unmarshal: " + err.Error())
-	}
-	if Response.Success {
-		text = Response.Content
-	} else if err == nil {
-		text = "Error: " + Response.Message
+		WriteLog("Error in GetRemoteFile restCallURL: " + err.Error())
+	} else {
+		if Response.Success {
+			text = Response.Content
+		} else if err == nil {
+			text = "Error: " + Response.Message
+		}
 	}
 	return
 }
@@ -254,9 +270,10 @@ func SavePbx(Data *PBXType) (success bool) {
 	if !strings.Contains(Data.File, ".") {
 		Data.File += ".stc"
 	}
+
 	Data.File = dir + Data.File
-	_, err := os.Create(Data.File)
-	if os.IsExist(err) {
+	if FileExist(Data.File) {
+		success = false
 		Data.Message = "Already Exist"
 		Data.MessageType = "errormessage"
 	} else {
@@ -275,12 +292,7 @@ func SavePbx(Data *PBXType) (success bool) {
 	return
 }
 
-type ModifyFileType struct {
-	ResponseType
-	Result string `json:"result"`
-}
-
-func SaveRemoteFile(url string, file string, content string) (res ModifyFileType, CallErr error) {
+func SaveRemoteFile(url string, file string, content string) (res ResponseType, CallErr error) {
 	var obj = map[string]string{}
 	obj["filename"] = file
 	obj["content"] = content
@@ -366,12 +378,6 @@ type FileDataType struct {
 func GetFileData(fileName string, pbxfile string) (File FileDataType, CallErr error) {
 	File.FileName = fileName
 	if fileName != "" {
-		var obj = map[string]string{}
-		obj["filename"] = fileName
-		bytes, err := json.Marshal(obj)
-		if err != nil {
-			WriteLog("Error in GetFileData Marshal: " + err.Error())
-		}
 
 		url := GetConfigValueFrom(pbxfile, "url", "")
 		if url != "" {
@@ -385,7 +391,7 @@ func GetFileData(fileName string, pbxfile string) (File FileDataType, CallErr er
 			File.FileList = true
 			File.Files, CallErr = GetFilesList(url)
 		} else {
-			File, CallErr = GetFileContents(url, fileName, bytes)
+			File, CallErr = GetFileContents(url, fileName)
 		}
 	}
 	return
@@ -411,42 +417,16 @@ func GetIncludedFiles(content string, action string) (include []IncludeType) {
 	return
 }
 
-type FileType struct {
-	ResponseType
-	Content  string `json:"content"`
-	Filetime string `json:"filetime"`
-}
-
-func GetFileContents(url, fileName string, bytes []byte) (Data FileDataType, CallErr error) {
+func GetFileContents(url, fileName string) (Data FileDataType, CallErr error) {
 	Data.FileName = fileName
-	bytes, CallErr = restCallURL(url+"GetFile", bytes)
+	var response GetFileResponseType
+	response, CallErr = GetFile(url, fileName)
 	if CallErr != nil {
 		WriteLog("Error in GetFileContents restCallURL: " + CallErr.Error())
 	} else {
-		var response FileType
-		err := json.Unmarshal(bytes, &response)
-		if err != nil {
-			WriteLog("Error in GetFileContents Unmarshal: " + err.Error())
-		}
-		if response.Success {
-			// Display last updated time
-			if response.Filetime != "" {
-				FileTimeDot := strings.Contains(response.Filetime, ".")
-				if FileTimeDot || strings.Contains(response.Filetime, "+") {
-					terminateAt := "."
-					if !FileTimeDot {
-						terminateAt = "+"
-					}
-					response.Filetime = response.Filetime[0:strings.Index(response.Filetime, terminateAt)]
-				}
-				Data.LastUpdate = response.Filetime
-			}
-
-			Data.Include = GetIncludedFiles(response.Content, "Files?file=")
-			Data.Content = response.Content
-		} else {
-			CallErr = errors.New(response.Message)
-		}
+		Data.LastUpdate = response.Filetime
+		Data.Include = GetIncludedFiles(response.Content, "Files?file=")
+		Data.Content = response.Content
 	}
 	return
 }
@@ -508,26 +488,16 @@ func GetBackupFilesList(url string, bytes []byte, fileName string) (Files []stri
 	return
 }
 
-func doRetrieve(r *http.Request, fileName string, url string) {
+func doRetrieve(r *http.Request, fileName string, url string) (err error, Retrieve bool) {
 	if r.FormValue("retrieve") != "" {
-		// saveobj = JSONObject();
-		// saveobj.put("filename", fileName);
-		// saveobj.put("content", request.getParameter("content"));
-		// String requestText = saveobj.toJSONString();
-		// String resultText = General.restCallURL(url + "ModifyFile", requestText);
-		// JSONParser saveparser = new JSONParser();
-		// JSONObject saveresObj = (JSONObject) saveparser.parse(resultText);
-		// boolean res = (Boolean.valueOf(saveresObj.get("success").toString()));
-		// if (res) {
-		//     out.println("<p class=infomessage>File Replaced</p>");
-		//     out.println("<a href='Files?file=" + fileName + "'>View (Read only)</a>");
-		//     Web.displayReloadLink(fileName, out);
-		// }
-		// else {
-		//     out.println("<p class=errormessage>Error: " + saveresObj.get("message").toString() + "</p>");
-		// }
-
+		Retrieve = true
+		var Response ResponseType
+		Response, err = SaveRemoteFile(url, fileName, r.FormValue("content"))
+		if err == nil && !Response.Success {
+			err = errors.New(Response.Message)
+		}
 	}
+	return
 }
 
 type BackupFileContentType struct {
@@ -720,7 +690,7 @@ func CompareFile(Org, Backup FileDataType, originalFileName, backupFileName stri
 
 						startpoint++
 						if startpoint < endPoint {
-							i++
+							//	i++
 						}
 
 					}

@@ -30,6 +30,7 @@ func main() {
 	http.HandleFunc("/SimpleTrunk/Files", Files)
 	http.HandleFunc("/SimpleTrunk/BackupFiles", BackupFiles)
 	http.HandleFunc("/SimpleTrunk/CompareFiles", CompareFiles)
+	http.HandleFunc("/SimpleTrunk/EditFile", EditFile)
 
 	http.HandleFunc("/SimpleTrunk/PBX", PBX)
 

@@ -95,7 +95,7 @@ func InsertUser(username, password string) (err error) {
 }
 
 func FileExist(Path string) bool {
-	_, err := os.Stat(Path)
+	_, err := os.ReadFile(Path)
 	return !os.IsNotExist(err)
 }
 

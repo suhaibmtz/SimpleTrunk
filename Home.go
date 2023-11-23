@@ -121,18 +121,6 @@ func Home(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-var AdvancedTabs = []TabType{
-	{Value: "Status", Name: "Status"},
-	{Value: "Files", Name: "Files"},
-	{Value: "SIPNodes", Name: "SIP"},
-	{Value: "Dialplan", Name: "Dial plans"},
-	{Value: "Commands", Name: "CLI commands"},
-	{Value: "AMI", Name: "AMI commands"},
-	{Value: "Terminal", Name: "Terminal"},
-	{Value: "Logs", Name: "Logs"},
-	{Value: "Config", Name: "Configuration"},
-}
-
 func Logout(w http.ResponseWriter, r *http.Request) {
 	http.SetCookie(w, &http.Cookie{Name: "st-session", Value: ""})
 	http.Redirect(w, r, "login", http.StatusTemporaryRedirect)
@@ -283,7 +271,7 @@ func EditPBX(w http.ResponseWriter, r *http.Request) {
 				Data.AMIUser = GetConfigValueFrom(pbxFile, "amiuser", r.FormValue("amiuser"))
 				Data.AMIPass = GetConfigValueFrom(pbxFile, "amipass", r.FormValue("amipass"))
 				var err error
-				Data.RemoteConfig, err = GetRemoteFile(Data.Url, Data.File)
+				Data.RemoteConfig, err = GetRemoteFile(Data.Url)
 				if err != nil {
 					Data.Message = "Error: " + err.Error()
 					Data.MessageType = "errormessage"
