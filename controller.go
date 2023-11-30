@@ -373,7 +373,7 @@ func callAMI(pbxfile string, command string) (response ResponseType, Callerr err
 
 type FileDataType struct {
 	FileName   string
-	Files      []ListFileType
+	Files      []TableListType
 	LastUpdate string
 	Content    string
 	Include    []IncludeType
@@ -441,12 +441,12 @@ type ListFilesType struct {
 	Files []string `json:"files"`
 }
 
-type ListFileType struct {
+type TableListType struct {
 	Name  string
 	NewTR bool
 }
 
-func GetFilesList(url string) (Files []ListFileType, CallErr error) {
+func GetFilesList(url string) (Files []TableListType, CallErr error) {
 	var bytes []byte
 	bytes, CallErr = restCallURL(url+"ListFiles", nil)
 	if CallErr != nil {
@@ -457,7 +457,7 @@ func GetFilesList(url string) (Files []ListFileType, CallErr error) {
 		if err != nil {
 			WriteLog("Error in GetFilesList Unmarshal: " + err.Error())
 		} else if response.Success {
-			var record ListFileType
+			var record TableListType
 			for i, file := range response.Files {
 				i1 := i + 1
 				record.NewTR = i1%6 == 0

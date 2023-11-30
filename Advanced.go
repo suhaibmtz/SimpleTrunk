@@ -381,7 +381,7 @@ func EditFile(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-type NodesType struct {
+type SipNodesType struct {
 	HeaderType
 	Nodes []string
 }
@@ -391,7 +391,7 @@ func SIPNodes(w http.ResponseWriter, r *http.Request) {
 	if exist {
 		pbxfile := GetPBXDir() + GetCookieValue(r, "file")
 		if FileExist(pbxfile) {
-			var Data NodesType
+			var Data SipNodesType
 			Data.HeaderType = GetAdvancedHeader(User.Name, "SIP", "", r)
 			AgentUrl := GetConfigValueFrom(pbxfile, "url", "")
 			if AgentUrl != "" {
@@ -515,22 +515,44 @@ func EditNode(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+type DialplanType struct {
+	HeaderType
+	Nodes []TableListType
+}
+
 func Dialplan(w http.ResponseWriter, r *http.Request) {
 	exist, User := CheckSession(r)
 	if exist {
 		pbxfile := GetPBXDir() + GetCookieValue(r, "file")
 		if FileExist(pbxfile) {
-			var Data NodesType
-			Data.HeaderType = GetAdvancedHeader(User.Name, "SIP", "", r)
+			var Data DialplanType
+			Data.HeaderType = GetAdvancedHeader(User.Name, "Dial plans", "", r)
 			AgentUrl := GetConfigValueFrom(pbxfile, "url", "")
 			if AgentUrl != "" {
 				if string(AgentUrl[len(AgentUrl)-1]) != "/" {
 					AgentUrl += "/"
 				}
 			}
-			res, _ := GetFile(AgentUrl, "extensions.conf")
-			Data.Nodes = GetNodes(res.Content)
-			err := mytemplate.ExecuteTemplate(w, "advDialPlans.html", Data)
+			res, err := GetFile(AgentUrl, "extensions.conf")
+			var message string
+			if err != nil {
+				message = err.Error()
+			} else if !res.Success {
+				message = res.Message
+			}
+			if message != "" {
+				Data.Message = "Error: " + message
+			}
+
+			nodes := GetNodes(res.Content)
+			for i, node := range nodes {
+				var record TableListType
+				record.Name = node
+				record.NewTR = (i+1)%6 == 0
+				Data.Nodes = append(Data.Nodes, record)
+			}
+
+			err = mytemplate.ExecuteTemplate(w, "advDialPlans.html", Data)
 			if err != nil {
 				WriteLog("Error in Advanced execute template: " + err.Error())
 			}
@@ -540,5 +562,9 @@ func Dialplan(w http.ResponseWriter, r *http.Request) {
 	} else {
 		http.Redirect(w, r, "login", http.StatusTemporaryRedirect)
 	}
+
+}
+
+func Commands(w http.ResponseWriter, r *http.Request) {
 
 }

@@ -2,4 +2,15 @@
 <br>
 <h3>Dialplans</h3>
 <a href='EditNode?filename=extensions.conf'>Add new dial-plan</a>
+<table class=dtable>
+<tr>
+{{range .Nodes}}
+<td>
+<a href='EditNode?filename=extensions.conf&nodename={{.Name}}'>[{{.Name}}]</a></td>
+{{ if .NewTR}}
+</tr><tr>
+{{end}}
+{{end}}
+</tr>
+</table>
 {{ template "footer" . }}
