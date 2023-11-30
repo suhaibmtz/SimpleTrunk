@@ -33,15 +33,18 @@ func GetPBXFiles() (Files []PBXFileType) {
 			}
 		}
 	}
-	for i, file := range InfoFiles {
+	Count := 0
+	for _, file := range InfoFiles {
 		record := GetPBXFile(file.Name())
-		i1 := i + 1
-		if i1%2 == 0 {
+		if record.IsStc {
+			Count += 1
+		}
+		if (Count+1)%2 == 0 {
 			record.Color = "#dAbaa7"
 		} else {
 			record.Color = "#dececa"
 		}
-		record.NewTR = i1%5 == 0
+		record.NewTR = Count%5 == 0
 		Files = append(Files, record)
 	}
 	return
@@ -228,21 +231,23 @@ func GetFile(url, filename string) (response GetFileResponseType, err error) {
 	bytes, err = restCallURL(url+"GetFile", data)
 	if err == nil {
 		err = json.Unmarshal(bytes, &response)
-		if response.Success {
-			// Display last updated time
-			if response.Filetime != "" {
-				FileTimeDot := strings.Contains(response.Filetime, ".")
-				if FileTimeDot || strings.Contains(response.Filetime, "+") {
-					terminateAt := "."
-					if !FileTimeDot {
-						terminateAt = "+"
+		if err == nil {
+			if response.Success {
+				// Display last updated time
+				if response.Filetime != "" {
+					FileTimeDot := strings.Contains(response.Filetime, ".")
+					if FileTimeDot || strings.Contains(response.Filetime, "+") {
+						terminateAt := "."
+						if !FileTimeDot {
+							terminateAt = "+"
+						}
+						response.Filetime = response.Filetime[0:strings.Index(response.Filetime, terminateAt)]
 					}
-					response.Filetime = response.Filetime[0:strings.Index(response.Filetime, terminateAt)]
 				}
-			}
 
-		} else {
-			err = errors.New(response.Message)
+			} else {
+				err = errors.New(response.Message)
+			}
 		}
 	}
 	return
@@ -264,26 +269,26 @@ func GetRemoteFile(url string) (text string, err error) {
 	return
 }
 
-func SavePbx(Data *PBXType) (success bool) {
+func SavePbx(Data *PBXType, edit bool) (success bool) {
 	CheckFolder()
 	dir := GetPBXDir()
 	if !strings.Contains(Data.File, ".") {
 		Data.File += ".stc"
 	}
 
-	Data.File = dir + Data.File
-	if FileExist(Data.File) {
+	file := dir + Data.File
+	if FileExist(Data.File) && !edit {
 		success = false
 		Data.Message = "Already Exist"
 		Data.MessageType = "errormessage"
 	} else {
 		Data.Url = strings.ReplaceAll(Data.Url, `\`, "")
-		success = SetConfigValueTo(Data.File, "url", Data.Url)
+		success = SetConfigValueTo(file, "url", Data.Url)
 		if success {
-			SetConfigValueTo(Data.File, "index", fmt.Sprint(Data.Count))
-			success = SetConfigValueTo(Data.File, "title", Data.Title)
-			SetConfigValueTo(Data.File, "amiuser", Data.AMIUser)
-			SetConfigValueTo(Data.File, "amipass", Data.AMIPass)
+			SetConfigValueTo(file, "index", fmt.Sprint(Data.Count))
+			success = SetConfigValueTo(file, "title", Data.Title)
+			SetConfigValueTo(file, "amiuser", Data.AMIUser)
+			SetConfigValueTo(file, "amipass", Data.AMIPass)
 		} else {
 			Data.Message = "Unable to write configuration"
 			Data.MessageType = "errormessage"
@@ -704,6 +709,111 @@ func CompareFile(Org, Backup FileDataType, originalFileName, backupFileName stri
 			}
 		}
 		BackUpLines = append(BackUpLines, Line)
+	}
+	return
+}
+
+func GetNodes(Content string) (nodes []string) {
+	arr := strings.Split(Content, "\n")
+	for _, line := range arr {
+		line = strings.TrimSpace(line)
+		if strings.Index(line, "[") == 0 && strings.Index(line, "]") > 2 {
+			line = line[1:strings.Index(line, "]")]
+			nodes = append(nodes, line)
+		}
+	}
+
+	return nodes
+}
+
+func addNewNode(fileName, nodename, content, url string) (message string) {
+
+	saveobj := make(map[string]string)
+	saveobj["filename"] = fileName
+	saveobj["nodename"] = nodename
+	saveobj["content"] = content
+	bytes, _ := json.Marshal(saveobj)
+	bytes, err := restCallURL(url+"AddNode", bytes)
+	if err != nil {
+		WriteLog("Error in addNewNode: " + err.Error())
+		message = err.Error()
+	} else {
+		var Response ResponseType
+		err = json.Unmarshal(bytes, &Response)
+		if err != nil {
+			WriteLog("Error in addNewNode Unmarshal: " + err.Error())
+			message = err.Error()
+		} else {
+			if !Response.Success {
+				message = Response.Message
+			}
+		}
+	}
+	return
+}
+
+func GetNodeContent(fileName, AgentUrl, nodename string) (content, message string) {
+
+	res, err := GetFile(AgentUrl, fileName)
+	if err != nil {
+		message = err.Error()
+	} else {
+		if res.Success {
+			arr := strings.SplitAfter(res.Content, "\n")
+
+			started := false
+			found := false
+			for _, line := range arr {
+				line = strings.TrimSpace(line)
+				if !found && strings.Contains(line, nodename) {
+					started = true
+					found = true
+				} else if started && strings.Contains(line, "[") && (strings.Index(line, "[") < 5) {
+					started = false
+				}
+
+				if started {
+					if line != "" {
+						content += line + "\n"
+					}
+				}
+
+			}
+		} else {
+			message = res.Message
+		}
+	}
+	return
+}
+
+func SaveNode(r *http.Request, fileName, nodename, url string) (res ResponseType, err error) {
+	if r.FormValue("save") != "" {
+		saveobj := make(map[string]string)
+		saveobj["filename"] = fileName
+		saveobj["nodename"] = nodename
+		saveobj["content"] = r.FormValue("content")
+		bytes, _ := json.Marshal(saveobj)
+		bytes, err = restCallURL(url+"ModifyNode", bytes)
+		if err != nil {
+			WriteLog("Error in SaveNode: " + err.Error())
+		} else {
+			//displayReloadLink(fileName, out)
+			err = json.Unmarshal(bytes, &res)
+		}
+
+	}
+	return
+}
+
+func GetReloadCommand(fileName string) (command, caption string) {
+
+	if fileName == "extensions.conf" || fileName == "sip.conf" {
+		command = "dialplanreload"
+		caption = "Reload Dialplan"
+		if fileName == "sip.conf" {
+			command = "sipreload"
+			caption = "Reload SIP"
+		}
 	}
 	return
 }

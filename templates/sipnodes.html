@@ -1,0 +1,13 @@
+{{ template "header" . }}
+<br>
+<h2>SIP Nodes</h2>
+<a href='EditNode?filename=sip.conf' class='linkbutton'>
+Add new SIP node</a>
+<table class=dtable><tr><th>Node</th><th></th></tr>
+{{ range .Nodes}}
+<tr>
+<td><a href='EditNode?filename=sip.conf&nodename={{.}}'>[{{.}}]</a></td>
+</tr>
+{{end}}
+</table>
+{{ template "footer" . }}

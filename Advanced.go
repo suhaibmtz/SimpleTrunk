@@ -22,7 +22,6 @@ var AdvancedTabs = []TabType{
 func GetAdvancedHeader(name, page, page2 string, r *http.Request) (Data HeaderType) {
 	Data = GetHeader(name, "Advanced", r)
 	AdvancedTabs := TabsType{Selected: page, Tabs: AdvancedTabs}
-	Data.Tabs = append(Data.Tabs, AdvancedTabs)
 	var Tabs TabsType
 	switch page {
 	case "Status":
@@ -53,8 +52,9 @@ func GetAdvancedHeader(name, page, page2 string, r *http.Request) (Data HeaderTy
 			},
 		}
 	case "EditFile":
-		Data.Tabs[0].Selected = "Files"
+		AdvancedTabs.Selected = "Files"
 	}
+	Data.Tabs = append(Data.Tabs, AdvancedTabs)
 	if Tabs.Text != "" {
 		Data.Tabs = append(Data.Tabs, Tabs)
 	}
@@ -379,4 +379,166 @@ func EditFile(w http.ResponseWriter, r *http.Request) {
 	} else {
 		http.Redirect(w, r, "login", http.StatusTemporaryRedirect)
 	}
+}
+
+type NodesType struct {
+	HeaderType
+	Nodes []string
+}
+
+func SIPNodes(w http.ResponseWriter, r *http.Request) {
+	exist, User := CheckSession(r)
+	if exist {
+		pbxfile := GetPBXDir() + GetCookieValue(r, "file")
+		if FileExist(pbxfile) {
+			var Data NodesType
+			Data.HeaderType = GetAdvancedHeader(User.Name, "SIP", "", r)
+			AgentUrl := GetConfigValueFrom(pbxfile, "url", "")
+			if AgentUrl != "" {
+				if string(AgentUrl[len(AgentUrl)-1]) != "/" {
+					AgentUrl += "/"
+				}
+			}
+
+			Res, err := GetFile(AgentUrl, "sip.conf")
+			if err != nil {
+				Data.Message = "Error: " + err.Error()
+				Data.MessageType = "errormessage"
+			} else {
+				if Res.Success {
+					nodes := GetNodes(Res.Content)
+					reverseStr := GetCookieValue(r, "reverse")
+					reverse := reverseStr == "yes"
+					if reverse {
+						for i := len(nodes) - 1; i >= 0; i-- {
+							Data.Nodes = append(Data.Nodes, nodes[i])
+						}
+					} else {
+						Data.Nodes = nodes
+					}
+
+				}
+			}
+			err = mytemplate.ExecuteTemplate(w, "sipnodes.html", Data)
+			if err != nil {
+				WriteLog("Error in Advanced execute template: " + err.Error())
+			}
+		} else {
+			http.Redirect(w, r, "Home", http.StatusTemporaryRedirect)
+		}
+	} else {
+		http.Redirect(w, r, "login", http.StatusTemporaryRedirect)
+	}
+}
+
+type EditNodeType struct {
+	HeaderType
+	FileName string
+	NodeName string
+	Content  string
+	Command  string
+	Caption  string
+	Edit     bool
+}
+
+func EditNode(w http.ResponseWriter, r *http.Request) {
+	exist, User := CheckSession(r)
+	if exist {
+		tabName := "SIP"
+		fileName := r.FormValue("filename")
+		if !strings.Contains(fileName, "sip.") {
+			tabName = "Dial plans"
+		}
+		pbxfile := GetPBXDir() + GetCookieValue(r, "file")
+		if FileExist(pbxfile) {
+			var Data EditNodeType
+			Data.HeaderType = GetAdvancedHeader(User.Name, tabName, "", r)
+
+			Data.FileName = fileName
+			AgentUrl := GetConfigValueFrom(pbxfile, "url", "")
+			if AgentUrl != "" {
+				if string(AgentUrl[len(AgentUrl)-1]) != "/" {
+					AgentUrl += "/"
+				}
+			}
+
+			Data.NodeName = r.FormValue("nodename")
+			if !strings.Contains(Data.NodeName, "[") && Data.NodeName != "" {
+				Data.NodeName = "[" + Data.NodeName + "]"
+			}
+
+			if Data.NodeName != "" {
+				if r.FormValue("add") != "" {
+					message := addNewNode(fileName, Data.NodeName, r.FormValue("content"), AgentUrl)
+					if message == "" {
+						Data.Message = "New node " + Data.NodeName + " has been added"
+						Data.MessageType = "infomessage"
+					} else {
+						Data.Message = "Error: " + message
+						Data.MessageType = "errormessage"
+					}
+				}
+				Data.Edit = r.FormValue("edit") != ""
+				res, err := SaveNode(r, fileName, Data.NodeName, AgentUrl)
+				var message string
+				if err != nil {
+					message = err.Error()
+				} else if !res.Success {
+					message = res.Message
+				} else {
+					Data.Message = "Saved"
+					Data.MessageType = "infomessage"
+					Data.Command, Data.Caption = GetReloadCommand(fileName)
+				}
+
+				if message != "" {
+					Data.Message = message
+					Data.MessageType = "errormessage"
+				}
+
+				Data.Content, message = GetNodeContent(fileName, AgentUrl, Data.NodeName)
+				if message != "" {
+					Data.Message = message
+					Data.MessageType = "errormessage"
+				}
+			}
+
+			err := mytemplate.ExecuteTemplate(w, "editnode.html", Data)
+			if err != nil {
+				WriteLog("Error in Advanced execute template: " + err.Error())
+			}
+		} else {
+			http.Redirect(w, r, "Home", http.StatusTemporaryRedirect)
+		}
+	} else {
+		http.Redirect(w, r, "login", http.StatusTemporaryRedirect)
+	}
+}
+
+func Dialplan(w http.ResponseWriter, r *http.Request) {
+	exist, User := CheckSession(r)
+	if exist {
+		pbxfile := GetPBXDir() + GetCookieValue(r, "file")
+		if FileExist(pbxfile) {
+			var Data NodesType
+			Data.HeaderType = GetAdvancedHeader(User.Name, "SIP", "", r)
+			AgentUrl := GetConfigValueFrom(pbxfile, "url", "")
+			if AgentUrl != "" {
+				if string(AgentUrl[len(AgentUrl)-1]) != "/" {
+					AgentUrl += "/"
+				}
+			}
+			res, _ := GetFile(AgentUrl, "extensions.conf")
+			Data.Nodes = GetNodes(res.Content)
+			err := mytemplate.ExecuteTemplate(w, "advDialPlans.html", Data)
+			if err != nil {
+				WriteLog("Error in Advanced execute template: " + err.Error())
+			}
+		} else {
+			http.Redirect(w, r, "Home", http.StatusTemporaryRedirect)
+		}
+	} else {
+		http.Redirect(w, r, "login", http.StatusTemporaryRedirect)
+	}
+
 }
