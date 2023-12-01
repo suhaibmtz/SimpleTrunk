@@ -328,12 +328,6 @@ func UpdateUserPassword(id int, newPass string) (success bool, message string) {
 	return
 }
 
-type AMIResult struct {
-	Success      bool   `json:"success"`
-	ErrorMessage string `json:"errorMessage"`
-	Result       string `json:"Result"`
-}
-
 func callAMICommand(pbxfile string, command string) (ResponseType, error) {
 
 	command = "action:command\ncommand:" + command
@@ -814,6 +808,56 @@ func GetReloadCommand(fileName string) (command, caption string) {
 			command = "sipreload"
 			caption = "Reload SIP"
 		}
+	}
+	return
+}
+
+func callCLI(url, command string) (res ResponseType, err error) {
+
+	obj := make(map[string]string)
+	obj["command"] = command
+	data, _ := json.Marshal(obj)
+
+	bytes, err := restCallURL(url+"Command", data)
+	if err == nil {
+		err = json.Unmarshal(bytes, &res)
+		if err != nil {
+			WriteLog("Error in CallCLI Unmarshal: " + err.Error())
+		}
+	} else {
+		WriteLog("Error in CallCLI: " + err.Error())
+	}
+	return
+}
+
+func executeShell(command, url string) (res ResponseType, err error) {
+
+	obj := make(map[string]string)
+	obj["command"] = command
+	data, _ := json.Marshal(obj)
+
+	var bytes []byte
+	bytes, err = restCallURL(url+"Shell", data)
+	if err != nil {
+		WriteLog("Error in executeShell Callurl: " + err.Error())
+	} else {
+		err = json.Unmarshal(bytes, &res)
+	}
+	return
+}
+
+func GetLogTail(url, file string, lines string) (res GetFileResponseType, err error) {
+	obj := make(map[string]any)
+	obj["file"] = file
+	obj["lines"] = lines
+	data, _ := json.Marshal(obj)
+
+	var bytes []byte
+	bytes, err = restCallURL(url+"GetLogTail", data)
+	if err != nil {
+		WriteLog("Error in getLogTail CallURL: " + err.Error())
+	} else {
+		json.Unmarshal(bytes, &res)
 	}
 	return
 }

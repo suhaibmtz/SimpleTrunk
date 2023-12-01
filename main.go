@@ -32,6 +32,10 @@ func main() {
 	http.HandleFunc("/SimpleTrunk/SIPNodes", SIPNodes)
 	http.HandleFunc("/SimpleTrunk/EditNode", EditNode)
 	http.HandleFunc("/SimpleTrunk/Dialplan", Dialplan)
+	http.HandleFunc("/SimpleTrunk/Commands", Commands)
+	http.HandleFunc("/SimpleTrunk/AMI", AMI)
+	http.HandleFunc("/SimpleTrunk/Terminal", Terminal)
+	http.HandleFunc("/SimpleTrunk/Logs", Logs)
 	//Advanced Files
 	http.HandleFunc("/SimpleTrunk/Files", Files)
 	http.HandleFunc("/SimpleTrunk/BackupFiles", BackupFiles)

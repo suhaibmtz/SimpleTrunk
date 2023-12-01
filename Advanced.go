@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 )
 
 var AdvancedTabs = []TabType{
@@ -53,6 +54,17 @@ func GetAdvancedHeader(name, page, page2 string, r *http.Request) (Data HeaderTy
 		}
 	case "EditFile":
 		AdvancedTabs.Selected = "Files"
+	case "CLI commands":
+		Tabs = TabsType{Selected: page2, Text: "CLI Commands",
+			Tabs: []TabType{
+				{Value: "?command=corereload", Name: "core reload"},
+				{Value: "?command=sipreload", Name: "sip reload"},
+				{Value: "?command=dialplanreload", Name: "dialplan reload"},
+				{Value: "?command=version", Name: "version"},
+				{Value: "?command=help", Name: "Help"},
+			},
+		}
+
 	}
 	Data.Tabs = append(Data.Tabs, AdvancedTabs)
 	if Tabs.Text != "" {
@@ -421,7 +433,7 @@ func SIPNodes(w http.ResponseWriter, r *http.Request) {
 			}
 			err = mytemplate.ExecuteTemplate(w, "sipnodes.html", Data)
 			if err != nil {
-				WriteLog("Error in Advanced execute template: " + err.Error())
+				WriteLog("Error in sipNodes execute template: " + err.Error())
 			}
 		} else {
 			http.Redirect(w, r, "Home", http.StatusTemporaryRedirect)
@@ -471,6 +483,7 @@ func EditNode(w http.ResponseWriter, r *http.Request) {
 				if r.FormValue("add") != "" {
 					message := addNewNode(fileName, Data.NodeName, r.FormValue("content"), AgentUrl)
 					if message == "" {
+						WriteLog(User.Name + " Added: " + Data.NodeName)
 						Data.Message = "New node " + Data.NodeName + " has been added"
 						Data.MessageType = "infomessage"
 					} else {
@@ -505,7 +518,7 @@ func EditNode(w http.ResponseWriter, r *http.Request) {
 
 			err := mytemplate.ExecuteTemplate(w, "editnode.html", Data)
 			if err != nil {
-				WriteLog("Error in Advanced execute template: " + err.Error())
+				WriteLog("Error in EditNode execute template: " + err.Error())
 			}
 		} else {
 			http.Redirect(w, r, "Home", http.StatusTemporaryRedirect)
@@ -554,7 +567,7 @@ func Dialplan(w http.ResponseWriter, r *http.Request) {
 
 			err = mytemplate.ExecuteTemplate(w, "advDialPlans.html", Data)
 			if err != nil {
-				WriteLog("Error in Advanced execute template: " + err.Error())
+				WriteLog("Error in DialPlans execute template: " + err.Error())
 			}
 		} else {
 			http.Redirect(w, r, "Home", http.StatusTemporaryRedirect)
@@ -565,6 +578,230 @@ func Dialplan(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func Commands(w http.ResponseWriter, r *http.Request) {
+type CommandsType struct {
+	HeaderType
+	TextCommand bool
+	Command     string
+	Result      string
+}
 
+func Commands(w http.ResponseWriter, r *http.Request) {
+	exist, User := CheckSession(r)
+	if exist {
+		pbxfile := GetPBXDir() + GetCookieValue(r, "file")
+		if FileExist(pbxfile) {
+			var Data CommandsType
+			AgentUrl := GetConfigValueFrom(pbxfile, "url", "")
+			if AgentUrl != "" {
+				if string(AgentUrl[len(AgentUrl)-1]) != "/" {
+					AgentUrl += "/"
+				}
+			}
+			command := r.FormValue("command")
+			Data.Command = r.FormValue("commandtext")
+			var commandLine string
+			var selected string
+			switch command {
+			case "corereload":
+				commandLine = "core reload"
+				selected = "core reload"
+			case "sipreload":
+				commandLine = "sip reload"
+				selected = "sip reload"
+			case "dialplanreload":
+				commandLine = "dialplan reload"
+				selected = "dialplan reload"
+			case "version":
+				commandLine = "core show version"
+			case "help":
+				commandLine = "core show help"
+			case "text":
+				commandLine = Data.Command
+			}
+			if selected == "" {
+				selected = command
+			}
+			if selected != "text" {
+				Data.Command = selected
+			}
+			Data.HeaderType = GetAdvancedHeader(User.Name, "CLI commands", selected, r)
+			if command != "" {
+				Data.TextCommand = command == "text"
+
+				var res ResponseType
+				var err error
+				if strings.Contains(commandLine, "reload") {
+					res, err = callCLI(AgentUrl, commandLine)
+				} else {
+					res, err = callAMICommand(pbxfile, commandLine)
+				}
+				if err != nil {
+					Data.Message = "Error: " + err.Error()
+					Data.MessageType = "errormessage"
+				}
+				if res.Success {
+					Data.Result = res.Message
+				}
+				if Data.Result == "" {
+					Data.Result = res.Result
+				}
+			}
+			err := mytemplate.ExecuteTemplate(w, "commands.html", Data)
+			if err != nil {
+				WriteLog("Error in commands execute template: " + err.Error())
+			}
+		} else {
+			http.Redirect(w, r, "Home", http.StatusTemporaryRedirect)
+		}
+	} else {
+		http.Redirect(w, r, "login", http.StatusTemporaryRedirect)
+	}
+}
+
+type CommandType struct {
+	HeaderType
+	Command string
+	Result  string
+}
+
+func AMI(w http.ResponseWriter, r *http.Request) {
+	exist, User := CheckSession(r)
+	if exist {
+		pbxfile := GetPBXDir() + GetCookieValue(r, "file")
+		if FileExist(pbxfile) {
+			var Data CommandType
+			Data.HeaderType = GetAdvancedHeader(User.Name, "AMI commands", "", r)
+			Data.Command = r.FormValue("command")
+			if r.FormValue("execute") != "" {
+				result, err := callAMI(pbxfile, Data.Command)
+				if err != nil {
+					Data.Message = "Error: " + err.Error()
+					Data.MessageType = "errormessage"
+				} else {
+					if result.Success {
+						if result.Message != "" {
+							Data.Result = time.Now().String() + "\n" + result.Message
+						}
+					} else {
+						Data.Result = result.Message
+					}
+				}
+
+			}
+			err := mytemplate.ExecuteTemplate(w, "ami.html", Data)
+			if err != nil {
+				WriteLog("Error in commands execute template: " + err.Error())
+			}
+		} else {
+			http.Redirect(w, r, "Home", http.StatusTemporaryRedirect)
+		}
+	} else {
+		http.Redirect(w, r, "login", http.StatusTemporaryRedirect)
+	}
+}
+
+func Terminal(w http.ResponseWriter, r *http.Request) {
+	exist, User := CheckSession(r)
+	if exist {
+		pbxfile := GetPBXDir() + GetCookieValue(r, "file")
+		if FileExist(pbxfile) {
+			var Data CommandType
+			Data.HeaderType = GetAdvancedHeader(User.Name, "Terminal", "", r)
+			AgentUrl := GetConfigValueFrom(pbxfile, "url", "")
+			if AgentUrl != "" {
+				if string(AgentUrl[len(AgentUrl)-1]) != "/" {
+					AgentUrl += "/"
+				}
+			}
+			Data.Command = r.FormValue("command")
+			if r.FormValue("execute") != "" {
+				res, err := executeShell(Data.Command, AgentUrl)
+				if err != nil {
+					Data.Message = err.Error()
+					Data.MessageType = "errormessage"
+				} else {
+					if res.Success {
+						Data.Result = res.Result
+					} else {
+						Data.Result = res.Message
+					}
+				}
+
+			}
+			err := mytemplate.ExecuteTemplate(w, "terminal.html", Data)
+			if err != nil {
+				WriteLog("Error in Terminal execute template: " + err.Error())
+			}
+		} else {
+			http.Redirect(w, r, "Home", http.StatusTemporaryRedirect)
+		}
+	} else {
+		http.Redirect(w, r, "login", http.StatusTemporaryRedirect)
+	}
+}
+
+type LogsType struct {
+	HeaderType
+	Result string
+	File   string
+	Lines  string
+}
+
+func Logs(w http.ResponseWriter, r *http.Request) {
+	exist, User := CheckSession(r)
+	if exist {
+		pbxfile := GetPBXDir() + GetCookieValue(r, "file")
+		if FileExist(pbxfile) {
+			var Data LogsType
+			Data.HeaderType = GetAdvancedHeader(User.Name, "Logs", "", r)
+			AgentUrl := GetConfigValueFrom(pbxfile, "url", "")
+			if AgentUrl != "" {
+				if string(AgentUrl[len(AgentUrl)-1]) != "/" {
+					AgentUrl += "/"
+				}
+			}
+			linesStr := r.FormValue("size")
+			if linesStr == "" {
+				linesStr = GetCookieValue(r, "logsize")
+				if linesStr == "" {
+					linesStr = "40"
+				}
+			}
+			Data.File = r.FormValue("file")
+			Data.Lines = linesStr
+			if Data.File != "" {
+				var fileName string
+				if Data.File == "Messages" {
+					fileName = "/var/log/asterisk/messages"
+				} else if Data.File == "Full" {
+					fileName = "/var/log/asterisk/full"
+
+				}
+				co := &http.Cookie{Name: "logsize", Value: linesStr}
+				http.SetCookie(w, co)
+
+				// Call service
+				res, err := GetLogTail(AgentUrl, fileName, Data.Lines)
+				if err != nil {
+					Data.Message = "Error: " + err.Error()
+					Data.MessageType = "errormessage"
+				} else {
+					if res.Success {
+						Data.Result = res.Content
+					} else {
+						Data.Message = res.Message
+						Data.MessageType = "errormessage"
+					}
+				}
+			}
+			err := mytemplate.ExecuteTemplate(w, "logs.html", Data)
+			if err != nil {
+				WriteLog("Error in logs execute template: " + err.Error())
+			}
+		} else {
+			http.Redirect(w, r, "Home", http.StatusTemporaryRedirect)
+		}
+	} else {
+		http.Redirect(w, r, "login", http.StatusTemporaryRedirect)
+	}
 }

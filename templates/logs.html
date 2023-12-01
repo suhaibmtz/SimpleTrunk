@@ -1,0 +1,17 @@
+{{ template "header" . }}
+<br>
+<h2>Logs</h2>
+<table><tr>
+<td ><a href='Logs?file=Messages'>Messages</a></td>
+<td ><a href='Logs?file=Full'>Full Log</a></td>
+</tr></table>
+{{ if ne .File "" }}
+<h3>{{.File}}</h3>
+<form method=post>
+Display last <input type=text name=size size=2 value='{{.Lines}}'
+/> lines
+<input type=submit value=Refresh class=btn />
+</form>
+<pre>{{.Result}}</pre>
+{{end}}
+{{ template "footer" . }}

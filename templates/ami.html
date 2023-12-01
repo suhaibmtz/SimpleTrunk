@@ -1,0 +1,12 @@
+{{ template "header" . }}
+<br>
+<h2>AMI command</h2>
+<form method=post>
+<textarea name=command cols=50 rows=7 >
+{{ if ne .Command "" }}{{.Command}}{{end}}</textarea></br>
+<input type=submit value=Execute name=execute class=btn />
+</form>
+{{ if ne .Result "" }}
+<pre>{{.Result}}</pre>
+{{end}}
+{{ template "footer" . }}

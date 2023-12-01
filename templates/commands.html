@@ -1,0 +1,17 @@
+{{ template "header" . }}
+<br>
+<br/><form method=POST action='?command=text' >
+Command <input type=text name=commandtext size = 40
+{{if .TextCommand }}
+value = '{{.Command}}'
+{{end}}
+/>
+<input type=submit name=execute value='Execute' class=btn />
+{{ if not .TextCommand}}
+<h3>{{.Command}}</h3>
+{{end}}
+{{ if ne .Result "" }}
+<pre>{{.Result}}</pre>
+{{end}}
+</form>
+{{ template "footer" . }}
