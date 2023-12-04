@@ -1,12 +1,16 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type UserType struct {
@@ -534,6 +538,15 @@ func SplitAny(s string, seps string) []string {
 	return strings.FieldsFunc(s, splitter)
 }
 
+func Atoi(str string) (i int) {
+	var err error
+	i, err = strconv.Atoi(str)
+	if err != nil {
+		i = -1
+	}
+	return
+}
+
 func extractLineNumbers(token string) (dp DiffPosition) {
 
 	if strings.Contains(token, "a") {
@@ -544,31 +557,24 @@ func extractLineNumbers(token string) (dp DiffPosition) {
 		dp.Type = "c"
 	}
 
-	linesNumber := SplitAny(token, "abc")
+	linesNumber := SplitAny(token, "adc")
 	if len(linesNumber) > 1 {
 		firstFileLines := strings.Split(linesNumber[0], ",")
-		dp.FirstFileStartPos, _ = strconv.Atoi(firstFileLines[0])
+		dp.FirstFileStartPos = Atoi(firstFileLines[0])
 		if len(firstFileLines) >= 2 {
-			dp.FirstFileEndPos, _ = strconv.Atoi(firstFileLines[1])
+			dp.FirstFileEndPos = Atoi(firstFileLines[1])
 
 		} else {
-			dp.FirstFileEndPos, _ = strconv.Atoi(firstFileLines[0])
+			dp.FirstFileEndPos = Atoi(firstFileLines[0])
 		}
 
 		SecondFileLines := strings.Split(linesNumber[1], ",")
-		var err error
-		dp.SecondFileStartPos, err = strconv.Atoi(SecondFileLines[0])
-		if err != nil {
-			WriteLog("Error in extractLineNumbers start: " + err.Error())
-		}
+		dp.SecondFileStartPos = Atoi(SecondFileLines[0])
 		if len(SecondFileLines) >= 2 {
-			dp.SecondFileEndPos, err = strconv.Atoi(SecondFileLines[1])
+			dp.SecondFileEndPos = Atoi(SecondFileLines[1])
 
 		} else {
-			dp.SecondFileEndPos, err = strconv.Atoi(SecondFileLines[0])
-		}
-		if err != nil {
-			WriteLog("Error in extractLineNumbers end: " + err.Error())
+			dp.SecondFileEndPos = Atoi(SecondFileLines[0])
 		}
 	}
 
@@ -593,6 +599,87 @@ func diff(res ResponseType) (dpArr []DiffPosition) {
 	return
 }
 
+func FileToCompare(dpArr []DiffPosition, ContentArr []string, isBackup bool) (file []LineType) {
+	Count := 0
+	for i := 0; i < len(ContentArr); i++ {
+		var Line LineType
+		if i >= len(ContentArr) {
+			Line.LineN = i + 1
+			Line.Line = "\t"
+		} else {
+			if len(dpArr) == 0 {
+				Line.LineN = i + 1
+				Line.Line = ContentArr[i]
+			} else {
+				if dpArr[Count].SecondFileEndPos <= 0 && Count < len(dpArr)-1 {
+					Count++
+				}
+				startPoint := dpArr[Count].SecondFileStartPos - 1
+				endPoint := dpArr[Count].SecondFileEndPos
+				if startPoint < 0 {
+					startPoint = len(ContentArr)
+				}
+				if endPoint < 0 {
+					endPoint = len(ContentArr)
+				}
+				if startPoint == i {
+					for startPoint < endPoint && i < len(ContentArr) {
+						var Line LineType
+						Line.Line = ContentArr[i]
+						Line.LineN = i + 1
+						if isBackup {
+							switch dpArr[Count].Type {
+							case "a":
+								Line.SpanColor = "#02a322"
+								Line.Span = "▼"
+								break
+							case "d":
+								Line.Color = "#FFA0B4"
+								break
+							case "c":
+								Line.Color = "#A0C8FF"
+								break
+							}
+						} else {
+							switch dpArr[Count].Type {
+							case "a":
+								Line.Color = "#B4FFB4"
+								break
+							case "d":
+								Line.Span = "▼"
+								Line.SpanColor = "#ff3658"
+								break
+							case "c":
+								Line.Color = "#A0C8FF"
+								break
+							}
+						}
+						startPoint++
+						if startPoint < endPoint {
+							i++
+						}
+						file = append(file, Line)
+
+					}
+					if Count < len(dpArr)-1 {
+						Count++
+					}
+
+				} else {
+					Line.LineN = i + 1
+					Line.Line = ContentArr[i]
+				}
+
+			}
+
+		}
+		if Line.LineN != 0 {
+			file = append(file, Line)
+		}
+	}
+	return
+}
+
 func CompareFile(Org, Backup FileDataType, originalFileName, backupFileName string, dpArr []DiffPosition) (OrgLines []LineType, BackUpLines []LineType) {
 
 	originalContent := Org.Content
@@ -600,110 +687,8 @@ func CompareFile(Org, Backup FileDataType, originalFileName, backupFileName stri
 
 	originalContentArr := strings.Split(originalContent, "\n")
 	backupContentArr := strings.Split(backupContent, "\n")
-	originCount := 0
-	for i := 0; i < len(originalContentArr); i++ {
-		var Line LineType
-		Line.LineN = i + 1
-		if i >= len(originalContentArr) {
-			Line.Line = "\t"
-		} else {
-			if len(dpArr) == 0 {
-				Line.Line = originalContentArr[i]
-			} else {
-				if dpArr[originCount].SecondFileEndPos <= 0 {
-					originCount++
-				}
-				var startPoint, endPoint int
-				if len(dpArr) > originCount {
-					startPoint = dpArr[originCount].SecondFileStartPos - 1
-					endPoint = dpArr[originCount].SecondFileEndPos
-				}
-				if startPoint == i {
-					for startPoint < endPoint {
-						Line.Line = originalContentArr[i]
-						switch dpArr[originCount].Type {
-						case "a":
-							Line.Color = "#B4FFB4"
-							break
-						case "d":
-							Line.Span = " ▼"
-							Line.SpanColor = "#ff3658"
-							break
-						case "c":
-							Line.Color = "#A0C8FF"
-							break
-						}
-						startPoint++
-						if startPoint < endPoint {
-							i++
-						}
-
-					}
-					if originCount < len(dpArr)-1 {
-						originCount++
-					}
-
-				} else {
-					Line.Line = originalContentArr[i]
-				}
-
-			}
-
-		}
-		OrgLines = append(OrgLines, Line)
-	}
-	backupCount := 0
-	for i := 0; i < len(backupContentArr); i++ {
-		var Line LineType
-		Line.LineN = i + 1
-		if i >= len(backupContentArr) {
-			Line.Line = "\t"
-		} else {
-			if len(dpArr) == 0 {
-				Line.Line = backupContentArr[i]
-			} else {
-				if dpArr[backupCount].FirstFileEndPos <= 0 {
-					backupCount++
-				}
-				var startpoint, endPoint int
-				if len(dpArr) > backupCount {
-					startpoint = dpArr[backupCount].SecondFileStartPos - 1
-					endPoint = dpArr[backupCount].SecondFileEndPos
-				}
-				if startpoint == i {
-					for startpoint < endPoint {
-						Line.Line = backupContentArr[i]
-						switch dpArr[backupCount].Type {
-						case "a":
-							Line.Span = " ▼"
-							Line.SpanColor = "#02a322"
-							break
-						case "d":
-							Line.Color = "#FFA0B4"
-							break
-						case "c":
-							Line.Color = "#A0C8FF"
-							break
-
-						}
-
-						startpoint++
-						if startpoint < endPoint {
-							//	i++
-						}
-
-					}
-					if backupCount < len(dpArr)-1 {
-						backupCount++
-					}
-
-				} else {
-					Line.Line = backupContentArr[i]
-				}
-			}
-		}
-		BackUpLines = append(BackUpLines, Line)
-	}
+	OrgLines = FileToCompare(dpArr, originalContentArr, false)
+	BackUpLines = FileToCompare(dpArr, backupContentArr, true)
 	return
 }
 
@@ -860,4 +845,157 @@ func GetLogTail(url, file string, lines string) (res GetFileResponseType, err er
 		json.Unmarshal(bytes, &res)
 	}
 	return
+}
+
+type Operation struct {
+	Success   bool
+	ErrorCode int
+	Message   string
+	Size      int64
+}
+
+func DownloadFile2(fileURL string, urlParameters []byte, contentType string, w http.ResponseWriter) (op Operation, err error) {
+	/*
+
+			req,_ := http.NewRequest("GET",fileURL,bytes.NewReader(urlParameters))
+			req.Header.Set("Content-Type", contentType)
+		   // req.setDoOutput(true)
+		   // writer.write(urlParameters)
+		   WriteLog("URL " + fileURL)
+		   WriteLog("Parameters: " + urlParameters)
+		   responseCode = httpConn.getResponseCode()
+
+		   result := ""
+		   // always check HTTP response code first
+		   if (responseCode == HttpURLConnection.HTTP_OK) {
+
+		       // opens input stream from the HTTP connection
+			req.inp
+		       //String saveFilePath = filePath
+
+		       // opens an output stream to save into file
+		      // outputStream = new FileOutputStream(saveFilePath)
+
+		       long size = 0
+		       int bytesRead
+		       byte[] buffer = new byte[1024]
+
+		       while ((bytesRead = inputStream.read(buffer)) != -1) {
+		           outputStream.write(buffer, 0, bytesRead)
+		           size = size + bytesRead
+		       }
+		       if (size < 2048) {
+		           byte[] text = new byte[(int)size]
+		           System.arraycopy(buffer, 0, text, 0, (int)size)
+		           String str = new String(text)
+		           result = result + str
+
+		       }
+
+
+		       outputStream.close()
+		       inputStream.close()
+
+		       op.success = size > 2048
+		       op.size = size
+
+		       if (!op.success) {
+		           try {
+		             JSONParser parser = new JSONParser()
+		             JSONObject obj = (JSONObject)parser.parse(result)
+		             op.message = obj.get("message").toString()
+		           }
+		           catch (Exception ex){
+		               op.success = false
+		               op.errorCode = 5
+		               op.message = "Error while parsing result: " + ex.toString()
+		               General.writeEvent("Error : " + ex.toString())
+		           }
+		       }
+		   } else {
+		       op.success = false
+		       op.errorCode = 5
+		       op.message = "HTTP download Error"
+		       General.writeEvent("HTTP error: " + responseCode)
+		   }
+		   httpConn.disconnect()
+	*/
+	return
+}
+func DownloadFile(fileURL string, urlParameters []byte, contentType string, outputStream io.Writer) (*Operation, error) {
+	op := &Operation{}
+
+	// Open URL and handle error
+	u, err := url.Parse(fileURL)
+	if err != nil {
+		return nil, err
+	}
+	req, err := http.NewRequest(http.MethodPost, u.String(), bytes.NewReader(urlParameters))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", contentType)
+
+	// Create client for making the request
+	client := &http.Client{}
+
+	// Send request and handle response
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	// Check response status code
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("HTTP download error: %d", resp.StatusCode)
+	}
+
+	// Extract filename from URL or headers if possible
+	filename := u.Path
+	if contentDisposition := resp.Header.Get("Content-Disposition"); contentDisposition != "" {
+		parts := strings.Split(contentDisposition, ";")
+		for _, part := range parts {
+			if strings.TrimSpace(part) == "filename=" {
+				filename = strings.Trim(strings.SplitN(part, "=", 2)[1], "\"")
+				break
+			}
+		}
+	}
+
+	// Calculate estimated download speed
+	contentLength := resp.ContentLength
+	startTime := time.Now()
+
+	// Copy data and calculate downloaded bytes
+	written := 0
+	buffer := make([]byte, 1024)
+	for {
+		n, err := io.ReadFull(resp.Body, buffer)
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			return nil, err
+		}
+		outputStream.Write(buffer[:n])
+		written += n
+	}
+
+	// Calculate and display download speed
+	elapsed := time.Since(startTime)
+	speed := float64(written) / elapsed.Seconds() / 1024.0
+	fmt.Printf("\nDownloaded %s in %.2fs at %.2f MB/s\n", filename, elapsed.Seconds(), speed)
+
+	// Check file size and parse JSON if small
+	op.Success = true
+	op.Size = int64(written)
+	if contentLength < 2048 {
+		op.Message = string(buffer[:written])
+	} else {
+		// Implement JSON parsing and error handling for your specific needs
+		// ...
+	}
+
+	return op, nil
 }

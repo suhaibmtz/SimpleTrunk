@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -646,6 +647,9 @@ func Commands(w http.ResponseWriter, r *http.Request) {
 					Data.Result = res.Result
 				}
 			}
+			if r.FormValue("ret") != "" {
+				http.Redirect(w, r, r.Header.Get("referer"), http.StatusTemporaryRedirect)
+			}
 			err := mytemplate.ExecuteTemplate(w, "commands.html", Data)
 			if err != nil {
 				WriteLog("Error in commands execute template: " + err.Error())
@@ -798,6 +802,65 @@ func Logs(w http.ResponseWriter, r *http.Request) {
 			if err != nil {
 				WriteLog("Error in logs execute template: " + err.Error())
 			}
+		} else {
+			http.Redirect(w, r, "Home", http.StatusTemporaryRedirect)
+		}
+	} else {
+		http.Redirect(w, r, "login", http.StatusTemporaryRedirect)
+	}
+}
+
+func Config(w http.ResponseWriter, r *http.Request) {
+	exist, User := CheckSession(r)
+	if exist {
+		pbxfile := GetPBXDir() + GetCookieValue(r, "file")
+		if FileExist(pbxfile) {
+			Data := GetAdvancedHeader(User.Name, "Configuration", "", r)
+			err := mytemplate.ExecuteTemplate(w, "config.html", Data)
+			if err != nil {
+				WriteLog("Error in Config execute template: " + err.Error())
+			}
+		} else {
+			http.Redirect(w, r, "Home", http.StatusTemporaryRedirect)
+		}
+	} else {
+		http.Redirect(w, r, "login", http.StatusTemporaryRedirect)
+	}
+}
+
+func Backup(w http.ResponseWriter, r *http.Request) {
+	exist, _ := CheckSession(r)
+	if exist {
+		pbx := GetCookieValue(r, "file")
+		pbxfile := GetPBXDir() + pbx
+		if FileExist(pbxfile) {
+			AgentUrl := GetConfigValueFrom(pbxfile, "url", "")
+			if AgentUrl != "" {
+				if string(AgentUrl[len(AgentUrl)-1]) != "/" {
+					AgentUrl += "/"
+				}
+			}
+			WriteLog("Download file called from: " + r.RemoteAddr)
+			w.Header().Set("Content-Type", "application/zip")
+
+			obj := make(map[string]interface{})
+			obj["directory"] = "/etc/asterisk/"
+			obj["ext"] = ".conf"
+			obj["name"] = pbxfile
+
+			bytes, _ := json.Marshal(obj)
+			WriteLog("Downloading: " + pbx)
+			w.Header().Set("Content-Disposition", "attachment;filename="+pbx+".zip")
+
+			op, err := DownloadFile(AgentUrl+"BackupFiles", bytes, "application/zip", w)
+			if err != nil {
+				WriteLog("Error downloading file: " + err.Error())
+				return
+			}
+
+			WriteLog("Size: " + strconv.FormatInt(op.Size, 10))
+			r.ContentLength = op.Size
+
 		} else {
 			http.Redirect(w, r, "Home", http.StatusTemporaryRedirect)
 		}

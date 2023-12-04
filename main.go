@@ -36,6 +36,8 @@ func main() {
 	http.HandleFunc("/SimpleTrunk/AMI", AMI)
 	http.HandleFunc("/SimpleTrunk/Terminal", Terminal)
 	http.HandleFunc("/SimpleTrunk/Logs", Logs)
+	http.HandleFunc("/SimpleTrunk/Config", Config)
+	http.HandleFunc("/SimpleTrunk/Backup", Backup)
 	//Advanced Files
 	http.HandleFunc("/SimpleTrunk/Files", Files)
 	http.HandleFunc("/SimpleTrunk/BackupFiles", BackupFiles)
