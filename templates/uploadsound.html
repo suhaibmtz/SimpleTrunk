@@ -1,0 +1,38 @@
+{{ template "header" . }}
+<br>
+<h2>Sound files</h2>
+<form method=POST name=aform >
+<script>
+function setSubdirectory(avalue){
+  document.getElementById('directory').value = avalue;
+    aform.submit();
+    }
+    function setMaindirectory(avalue){
+      document.getElementById('dir').value = avalue;
+      aform.submit();
+    }
+</script>
+<input type=hidden id=directory name=directory />
+<input type=button name=up value=Up onclick="setMaindirectory('{{.Parent}}');" class=button /><br/>
+<input type=text name=dir id=dir value="{{.Dir}}" size = 50 />
+<input type=submit name=go value=Go />
+<table><tr><th>File name</th><th></th></tr>
+{{ $dir := .Dir}}
+{{ range .Files}}
+<tr><td>{{.Name}}</td>
+{{ if .IsDir}}
+<td><button onclick = "setSubdirectory('{{.Name}}');" class='btn' >Enter</button></td>
+{{else}}
+<td><a href='PlaySound?filename="{{$dir}}{{.Name}}"'>Play</a></td>
+{{end}}
+</tr>
+{{end}}
+</table>
+</form>
+<form method=POST action='UploadSoundFile' enctype='multipart/form-data'>
+<br/>Upload file
+<input type=hidden name=dir value='{{.Dir}}' />
+<input type=file name=file />
+<input type=submit name=uploadfile value='Upload' class='button'  />
+</form>
+{{ template "footer" . }}

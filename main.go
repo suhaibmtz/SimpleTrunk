@@ -38,6 +38,8 @@ func main() {
 	http.HandleFunc("/SimpleTrunk/Logs", Logs)
 	http.HandleFunc("/SimpleTrunk/Config", Config)
 	http.HandleFunc("/SimpleTrunk/Backup", Backup)
+	http.HandleFunc("/SimpleTrunk/UploadSound", UploadSound)
+	http.HandleFunc("/SimpleTrunk/PlaySound", PlaySound)
 	//Advanced Files
 	http.HandleFunc("/SimpleTrunk/Files", Files)
 	http.HandleFunc("/SimpleTrunk/BackupFiles", BackupFiles)

@@ -10,7 +10,6 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
-	"time"
 )
 
 type UserType struct {
@@ -854,74 +853,6 @@ type Operation struct {
 	Size      int64
 }
 
-func DownloadFile2(fileURL string, urlParameters []byte, contentType string, w http.ResponseWriter) (op Operation, err error) {
-	/*
-
-			req,_ := http.NewRequest("GET",fileURL,bytes.NewReader(urlParameters))
-			req.Header.Set("Content-Type", contentType)
-		   // req.setDoOutput(true)
-		   // writer.write(urlParameters)
-		   WriteLog("URL " + fileURL)
-		   WriteLog("Parameters: " + urlParameters)
-		   responseCode = httpConn.getResponseCode()
-
-		   result := ""
-		   // always check HTTP response code first
-		   if (responseCode == HttpURLConnection.HTTP_OK) {
-
-		       // opens input stream from the HTTP connection
-			req.inp
-		       //String saveFilePath = filePath
-
-		       // opens an output stream to save into file
-		      // outputStream = new FileOutputStream(saveFilePath)
-
-		       long size = 0
-		       int bytesRead
-		       byte[] buffer = new byte[1024]
-
-		       while ((bytesRead = inputStream.read(buffer)) != -1) {
-		           outputStream.write(buffer, 0, bytesRead)
-		           size = size + bytesRead
-		       }
-		       if (size < 2048) {
-		           byte[] text = new byte[(int)size]
-		           System.arraycopy(buffer, 0, text, 0, (int)size)
-		           String str = new String(text)
-		           result = result + str
-
-		       }
-
-
-		       outputStream.close()
-		       inputStream.close()
-
-		       op.success = size > 2048
-		       op.size = size
-
-		       if (!op.success) {
-		           try {
-		             JSONParser parser = new JSONParser()
-		             JSONObject obj = (JSONObject)parser.parse(result)
-		             op.message = obj.get("message").toString()
-		           }
-		           catch (Exception ex){
-		               op.success = false
-		               op.errorCode = 5
-		               op.message = "Error while parsing result: " + ex.toString()
-		               General.writeEvent("Error : " + ex.toString())
-		           }
-		       }
-		   } else {
-		       op.success = false
-		       op.errorCode = 5
-		       op.message = "HTTP download Error"
-		       General.writeEvent("HTTP error: " + responseCode)
-		   }
-		   httpConn.disconnect()
-	*/
-	return
-}
 func DownloadFile(fileURL string, urlParameters []byte, contentType string, outputStream io.Writer) (*Operation, error) {
 	op := &Operation{}
 
@@ -951,21 +882,8 @@ func DownloadFile(fileURL string, urlParameters []byte, contentType string, outp
 		return nil, fmt.Errorf("HTTP download error: %d", resp.StatusCode)
 	}
 
-	// Extract filename from URL or headers if possible
-	filename := u.Path
-	if contentDisposition := resp.Header.Get("Content-Disposition"); contentDisposition != "" {
-		parts := strings.Split(contentDisposition, ";")
-		for _, part := range parts {
-			if strings.TrimSpace(part) == "filename=" {
-				filename = strings.Trim(strings.SplitN(part, "=", 2)[1], "\"")
-				break
-			}
-		}
-	}
-
 	// Calculate estimated download speed
 	contentLength := resp.ContentLength
-	startTime := time.Now()
 
 	// Copy data and calculate downloaded bytes
 	written := 0
@@ -982,11 +900,6 @@ func DownloadFile(fileURL string, urlParameters []byte, contentType string, outp
 		written += n
 	}
 
-	// Calculate and display download speed
-	elapsed := time.Since(startTime)
-	speed := float64(written) / elapsed.Seconds() / 1024.0
-	fmt.Printf("\nDownloaded %s in %.2fs at %.2f MB/s\n", filename, elapsed.Seconds(), speed)
-
 	// Check file size and parse JSON if small
 	op.Success = true
 	op.Size = int64(written)
@@ -998,4 +911,36 @@ func DownloadFile(fileURL string, urlParameters []byte, contentType string, outp
 	}
 
 	return op, nil
+}
+
+func addSlash(folderName string) string {
+	if folderName[len(folderName)-1] != '/' {
+		folderName = folderName + "/"
+	}
+	return folderName
+}
+
+func removeSlash(folderName string) string {
+	if folderName[len(folderName)-1] == '/' {
+		folderName = folderName[0 : len(folderName)-1]
+	}
+	return folderName
+}
+
+func listFiles(url, folderName string) (files ListFilesType, err error) {
+	obj := make(map[string]string)
+	folderName = addSlash(folderName)
+	obj["foldername"] = folderName
+	data, _ := json.Marshal(obj)
+
+	var res []byte
+	res, err = restCallURL(url+"ListFiles", data)
+	if err != nil {
+		WriteLog("Error in listFiles: " + err.Error())
+	} else {
+		if res != nil && strings.Contains(string(res), "{") {
+			err = json.Unmarshal(res, &files)
+		}
+	}
+	return
 }

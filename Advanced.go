@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/url"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -860,6 +861,128 @@ func Backup(w http.ResponseWriter, r *http.Request) {
 
 			WriteLog("Size: " + strconv.FormatInt(op.Size, 10))
 			r.ContentLength = op.Size
+
+		} else {
+			http.Redirect(w, r, "Home", http.StatusTemporaryRedirect)
+		}
+	} else {
+		http.Redirect(w, r, "login", http.StatusTemporaryRedirect)
+	}
+}
+
+type SoundFileType struct {
+	IsDir bool
+	Name  string
+}
+
+type UploadSoundType struct {
+	HeaderType
+	Dir    string
+	Parent string
+	Files  []SoundFileType
+}
+
+func UploadSound(w http.ResponseWriter, r *http.Request) {
+	exist, User := CheckSession(r)
+	if exist {
+		pbxfile := GetPBXDir() + GetCookieValue(r, "file")
+		if FileExist(pbxfile) {
+			var Data UploadSoundType
+			Data.HeaderType = GetAdvancedHeader(User.Name, "Configuration", "", r)
+			AgentUrl := GetConfigValueFrom(pbxfile, "url", "")
+			if AgentUrl != "" {
+				if string(AgentUrl[len(AgentUrl)-1]) != "/" {
+					AgentUrl += "/"
+				}
+			}
+			dir := r.FormValue("dir")
+			if dir == "" {
+				rdir := r.FormValue("rdir")
+				if rdir != "" {
+					dir = rdir
+				} else {
+					dir = "/usr/share/asterisk/sounds"
+				}
+			}
+			message := r.FormValue("message")
+
+			if message != "" {
+				obj := make(map[string]string)
+				err := json.Unmarshal([]byte(message), &obj)
+				if err != nil {
+					WriteLog("Error in UploadSound Unmarshal: " + err.Error())
+				}
+				filename := obj["filename"]
+				amessage := obj["message"]
+				if obj["success"] == "true" {
+					Data.MessageType = "infomessage"
+					Data.Message = "File: " + filename + " : " + amessage
+				} else {
+					Data.MessageType = "warnmessage"
+					Data.Message = "File " + filename + " : " + amessage
+				}
+			}
+			dir = addSlash(dir)
+			directory := r.FormValue("directory")
+			if directory != "" {
+				dir = addSlash(dir + directory)
+			}
+			if len(dir) > 2 {
+				parent := removeSlash(dir)
+				parent = parent[0:strings.LastIndex(parent, string(os.PathSeparator))]
+				if parent == "" {
+					parent = string(os.PathSeparator)
+				}
+				Data.Parent = parent
+			}
+			Data.Dir = dir
+			filesRes, err := listFiles(AgentUrl, dir)
+			if err != nil {
+				message = err.Error()
+			} else {
+				files := filesRes.Files
+				for i := 0; i < len(files); i++ {
+					var record SoundFileType
+					record.Name = files[i]
+					record.IsDir = !(strings.Index(record.Name, ".") > 0)
+					Data.Files = append(Data.Files, record)
+				}
+			}
+			err = mytemplate.ExecuteTemplate(w, "uploadsound.html", Data)
+			if err != nil {
+				WriteLog("Error in UploadSound execute template: " + err.Error())
+			}
+		} else {
+			http.Redirect(w, r, "Home", http.StatusTemporaryRedirect)
+		}
+	} else {
+		http.Redirect(w, r, "login", http.StatusTemporaryRedirect)
+	}
+}
+
+func PlaySound(w http.ResponseWriter, r *http.Request) {
+	exist, _ := CheckSession(r)
+	if exist {
+		pbxfile := GetPBXDir() + GetCookieValue(r, "file")
+		if FileExist(pbxfile) {
+
+			AgentUrl := GetConfigValueFrom(pbxfile, "url", "")
+			if AgentUrl != "" {
+				if string(AgentUrl[len(AgentUrl)-1]) != "/" {
+					AgentUrl += "/"
+				}
+			}
+
+			contenttype := "audio/wav"
+			filename := r.FormValue("filename")
+			w.Header().Set("ContentType", contenttype)
+			obj := make(map[string]string)
+			obj["filename"] = filename
+			obj["contenttype"] = contenttype
+			bytes, _ := json.Marshal(obj)
+
+			w.Header().Set("Content-Disposition", "attachment;filename="+filename)
+			DownloadFile(AgentUrl+"DownloadFile", bytes, contenttype, w)
 
 		} else {
 			http.Redirect(w, r, "Home", http.StatusTemporaryRedirect)
