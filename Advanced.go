@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/url"
 	"os"
@@ -990,4 +991,55 @@ func PlaySound(w http.ResponseWriter, r *http.Request) {
 	} else {
 		http.Redirect(w, r, "login", http.StatusTemporaryRedirect)
 	}
+}
+
+type ReciveFileResponseTpye struct {
+	ResponseType
+	FileName string `json:"filename"`
+}
+
+func UploadSoundFile(w http.ResponseWriter, r *http.Request) {
+	exist, _ := CheckSession(r)
+	if exist {
+		pbxfile := GetPBXDir() + GetCookieValue(r, "file")
+		if FileExist(pbxfile) {
+
+			AgentUrl := GetConfigValueFrom(pbxfile, "url", "")
+			if AgentUrl != "" {
+				if string(AgentUrl[len(AgentUrl)-1]) != "/" {
+					AgentUrl += "/"
+				}
+			}
+			var message string
+			dir := r.FormValue("dir")
+			uploadurl := AgentUrl + "ReceiveFile"
+			r.ParseMultipartForm(20 << 40)
+			file, handler, err := r.FormFile("file")
+			if err != nil {
+				WriteLog("Error in UploadSoundFile form File: " + err.Error())
+			} else {
+				jsonrequest := make(map[string]any)
+				jsonrequest["filename"] = handler.Filename
+				jsonrequest["dir"] = dir
+				bytes, _ := io.ReadAll(file)
+				jsonrequest["content"] = strings.Split(string(bytes), "\n")
+				data, _ := json.Marshal(jsonrequest)
+				resp, err := restCallURL(uploadurl, data)
+				if err != nil {
+					message = err.Error()
+				} else {
+					var response ReciveFileResponseTpye
+					json.Unmarshal(resp, &response)
+					message = response.Message
+				}
+			}
+			rmessage := url.QueryEscape(message)
+			http.Redirect(w, r, "UploadSound?rdir="+dir+"&message="+rmessage, http.StatusTemporaryRedirect)
+		} else {
+			http.Redirect(w, r, "Home", http.StatusTemporaryRedirect)
+		}
+	} else {
+		http.Redirect(w, r, "login", http.StatusTemporaryRedirect)
+	}
+
 }

@@ -40,6 +40,7 @@ func main() {
 	http.HandleFunc("/SimpleTrunk/Backup", Backup)
 	http.HandleFunc("/SimpleTrunk/UploadSound", UploadSound)
 	http.HandleFunc("/SimpleTrunk/PlaySound", PlaySound)
+	http.HandleFunc("/SimpleTrunk/UploadSoundFile", UploadSoundFile)
 	//Advanced Files
 	http.HandleFunc("/SimpleTrunk/Files", Files)
 	http.HandleFunc("/SimpleTrunk/BackupFiles", BackupFiles)
