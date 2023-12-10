@@ -1,7 +1,9 @@
 package main
 
 import (
+	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -908,19 +910,20 @@ func UploadSound(w http.ResponseWriter, r *http.Request) {
 			message := r.FormValue("message")
 
 			if message != "" {
-				obj := make(map[string]string)
+				println(message)
+				var obj ReciveFileResponseType
 				err := json.Unmarshal([]byte(message), &obj)
 				if err != nil {
 					WriteLog("Error in UploadSound Unmarshal: " + err.Error())
 				}
-				filename := obj["filename"]
-				amessage := obj["message"]
-				if obj["success"] == "true" {
+				filename := obj.FileName
+				amessage := obj.Message
+				if obj.Success {
 					Data.MessageType = "infomessage"
 					Data.Message = "File: " + filename + " : " + amessage
 				} else {
 					Data.MessageType = "warnmessage"
-					Data.Message = "File " + filename + " : " + amessage
+					Data.Message = "File: " + filename + " : " + amessage
 				}
 			}
 			dir = addSlash(dir)
@@ -981,8 +984,14 @@ func PlaySound(w http.ResponseWriter, r *http.Request) {
 			obj["filename"] = filename
 			obj["contenttype"] = contenttype
 			bytes, _ := json.Marshal(obj)
+			lastindex := strings.LastIndex(filename, "/")
+			name := filename
+			if lastindex != -1 {
+				name = filename[lastindex+1 : len(filename)-1]
+			}
+			println(name)
 
-			w.Header().Set("Content-Disposition", "attachment;filename="+filename)
+			w.Header().Set("Content-Disposition", "attachment;filename="+name)
 			DownloadFile(AgentUrl+"DownloadFile", bytes, contenttype, w)
 
 		} else {
@@ -993,7 +1002,7 @@ func PlaySound(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-type ReciveFileResponseTpye struct {
+type ReciveFileResponseType struct {
 	ResponseType
 	FileName string `json:"filename"`
 }
@@ -1010,11 +1019,11 @@ func UploadSoundFile(w http.ResponseWriter, r *http.Request) {
 					AgentUrl += "/"
 				}
 			}
-			var message string
 			dir := r.FormValue("dir")
 			uploadurl := AgentUrl + "ReceiveFile"
 			r.ParseMultipartForm(20 << 40)
 			file, handler, err := r.FormFile("file")
+			var resp []byte
 			if err != nil {
 				WriteLog("Error in UploadSoundFile form File: " + err.Error())
 			} else {
@@ -1022,18 +1031,15 @@ func UploadSoundFile(w http.ResponseWriter, r *http.Request) {
 				jsonrequest["filename"] = handler.Filename
 				jsonrequest["dir"] = dir
 				bytes, _ := io.ReadAll(file)
-				jsonrequest["content"] = strings.Split(string(bytes), "\n")
-				data, _ := json.Marshal(jsonrequest)
-				resp, err := restCallURL(uploadurl, data)
-				if err != nil {
-					message = err.Error()
-				} else {
-					var response ReciveFileResponseTpye
-					json.Unmarshal(resp, &response)
-					message = response.Message
+				var content []string
+				for _, line := range strings.Split(string(bytes), "\n") {
+					content = append(content, base64.StdEncoding.EncodeToString([]byte(line+"\n")))
 				}
+				jsonrequest["content"] = content
+				data, _ := json.Marshal(jsonrequest)
+				resp, err = restCallURL(uploadurl, data)
 			}
-			rmessage := url.QueryEscape(message)
+			rmessage := string(resp)
 			http.Redirect(w, r, "UploadSound?rdir="+dir+"&message="+rmessage, http.StatusTemporaryRedirect)
 		} else {
 			http.Redirect(w, r, "Home", http.StatusTemporaryRedirect)
@@ -1042,4 +1048,74 @@ func UploadSoundFile(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "login", http.StatusTemporaryRedirect)
 	}
 
+}
+
+type AMIConfigType struct {
+	HeaderType
+	Success bool
+	Users   []AMIUserType
+}
+
+func AMIConfig(w http.ResponseWriter, r *http.Request) {
+	exist, User := CheckSession(r)
+	if exist {
+		pbxfile := GetPBXDir() + GetCookieValue(r, "file")
+		if FileExist(pbxfile) {
+			var Data AMIConfigType
+			Data.HeaderType = GetAdvancedHeader(User.Name, "Configuration", "", r)
+			AgentUrl := GetConfigValueFrom(pbxfile, "url", "")
+			if AgentUrl != "" {
+				if string(AgentUrl[len(AgentUrl)-1]) != "/" {
+					AgentUrl += "/"
+				}
+			}
+			var err error
+			Data.Users, Data.Success, err = AMIUsers(AgentUrl)
+			fmt.Println(err)
+			err = mytemplate.ExecuteTemplate(w, "AMIConfig.html", Data)
+			if err != nil {
+				WriteLog("Error in AMIConfig execute template: " + err.Error())
+				fmt.Fprintf(w, err.Error())
+			}
+		} else {
+			http.Redirect(w, r, "Home", http.StatusTemporaryRedirect)
+		}
+	} else {
+		http.Redirect(w, r, "login", http.StatusTemporaryRedirect)
+	}
+}
+
+type AMIUserType struct {
+	User    string
+	Spl     []string
+	Default bool
+}
+
+func AMIUsers(Aurl string) (users []AMIUserType, success bool, err error) {
+	var bytes []byte
+	bytes, err = restCallURL(Aurl+"GetAMIUsersInfo", nil)
+	if err == nil {
+		var res ResponseType
+		err = json.Unmarshal(bytes, &res)
+		if err == nil {
+			if res.Success {
+				if res.Result != "" {
+					success = true
+					spl := strings.Split(res.Result, ";")
+					for i := 0; i+1 < len(spl); i++ {
+						spl1 := strings.Split(spl[i], ":")
+						user := strings.ReplaceAll(spl1[0], "[", "")
+						user = strings.ReplaceAll(user, "]", "")
+						fmt.Println(spl1)
+						users = append(users, AMIUserType{User: user, Spl: spl1})
+					}
+				} else {
+					//"<p class=infomessage >There is no AMI User <a href=AMIConfig?adf=yes>Add AMI User</a></p>"
+				}
+			} else {
+				//out.println("<p class=errormessage >Error : " + res.get("message").toString() + "</p>")
+			}
+		}
+	}
+	return
 }

@@ -1,0 +1,29 @@
+{{ define "def" }}
+{{ if .Success}}
+<h4>AMI Users</h4><a href='AMIConfig?adf=yes'>Add New User</a>
+<table style=margin-top:10px class=dtable>
+<tr>
+<th>AMI User</th>
+<th>AMI Secret</th>
+<th>AMI Read Permission</th>
+<th>AMI Write Permission</th>
+<th>Edit</th>
+<th>Default</th>
+</tr>
+{{ range .Users }}
+<tr><td>{{.User}}</td>
+<td>{{ index .Spl 1}}</td>
+<td>{{ index .Spl 2}}</td>
+<td>{{ index .Spl 3}}</td>
+<td><a href="AMIConfig?edf={{index .Spl 0}}">Edit</a></td>
+<td>getDefault(user, {{index .Spl 0}}, pbxfile)</td>
+</tr>
+{{end}}
+</table><hr/>
+{{end}}
+{{end}}
+{{ template "header" . }}
+<br>
+<h2>AMI Configurations</h2>
+{{ template "def" . }}
+{{ template "footer" . }}

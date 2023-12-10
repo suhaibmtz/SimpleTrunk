@@ -8,7 +8,7 @@ import (
 
 var mytemplate *template.Template
 
-const Version = "0.6.8 1Dec"
+const Version = "0.6.9 10Dec"
 
 func main() {
 	mytemplate = template.Must(template.ParseGlob("templates/*.html"))
@@ -38,14 +38,16 @@ func main() {
 	http.HandleFunc("/SimpleTrunk/Logs", Logs)
 	http.HandleFunc("/SimpleTrunk/Config", Config)
 	http.HandleFunc("/SimpleTrunk/Backup", Backup)
-	http.HandleFunc("/SimpleTrunk/UploadSound", UploadSound)
-	http.HandleFunc("/SimpleTrunk/PlaySound", PlaySound)
-	http.HandleFunc("/SimpleTrunk/UploadSoundFile", UploadSoundFile)
+	http.HandleFunc("/SimpleTrunk/AMIConfig", AMIConfig)
 	//Advanced Files
 	http.HandleFunc("/SimpleTrunk/Files", Files)
 	http.HandleFunc("/SimpleTrunk/BackupFiles", BackupFiles)
 	http.HandleFunc("/SimpleTrunk/CompareFiles", CompareFiles)
 	http.HandleFunc("/SimpleTrunk/EditFile", EditFile)
+	//Sound
+	http.HandleFunc("/SimpleTrunk/UploadSound", UploadSound)
+	http.HandleFunc("/SimpleTrunk/PlaySound", PlaySound)
+	http.HandleFunc("/SimpleTrunk/UploadSoundFile", UploadSoundFile)
 
 	//PBX
 	http.HandleFunc("/SimpleTrunk/PBX", PBX)

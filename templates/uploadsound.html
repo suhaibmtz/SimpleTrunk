@@ -23,7 +23,7 @@ function setSubdirectory(avalue){
 {{ if .IsDir}}
 <td><button onclick = "setSubdirectory('{{.Name}}');" class='btn' >Enter</button></td>
 {{else}}
-<td><a href='PlaySound?filename="{{$dir}}{{.Name}}"'>Play</a></td>
+<td><a href='PlaySound?filename={{$dir}}{{.Name}}'>Play</a></td>
 {{end}}
 </tr>
 {{end}}

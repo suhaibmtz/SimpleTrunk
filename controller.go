@@ -857,11 +857,12 @@ func DownloadFile(fileURL string, urlParameters []byte, contentType string, outp
 	op := &Operation{}
 
 	// Open URL and handle error
-	u, err := url.Parse(fileURL)
-	if err != nil {
-		return nil, err
-	}
-	req, err := http.NewRequest(http.MethodPost, u.String(), bytes.NewReader(urlParameters))
+	/*u, err := */
+	url.Parse(fileURL)
+	// if err != nil {
+	// return nil, err
+	// }
+	req, err := http.NewRequest(http.MethodPost, fileURL, bytes.NewReader(urlParameters))
 	if err != nil {
 		return nil, err
 	}
@@ -899,15 +900,11 @@ func DownloadFile(fileURL string, urlParameters []byte, contentType string, outp
 		outputStream.Write(buffer[:n])
 		written += n
 	}
-
 	// Check file size and parse JSON if small
 	op.Success = true
 	op.Size = int64(written)
 	if contentLength < 2048 {
 		op.Message = string(buffer[:written])
-	} else {
-		// Implement JSON parsing and error handling for your specific needs
-		// ...
 	}
 
 	return op, nil
