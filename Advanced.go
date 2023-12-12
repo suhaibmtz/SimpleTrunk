@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -1052,8 +1053,15 @@ func UploadSoundFile(w http.ResponseWriter, r *http.Request) {
 
 type AMIConfigType struct {
 	HeaderType
+	// status and users
+	Ami     bool
+	Http    bool
 	Success bool
 	Users   []AMIUserType
+}
+
+func paramStatus(request *http.Request) bool {
+	return request.FormValue("adf") == "" && request.FormValue("edf") == ""
 }
 
 func AMIConfig(w http.ResponseWriter, r *http.Request) {
@@ -1070,9 +1078,17 @@ func AMIConfig(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 			var err error
-			Data.Users, Data.Success, err = AMIUsers(AgentUrl)
-			fmt.Println(err)
-			err = mytemplate.ExecuteTemplate(w, "AMIConfig.html", Data)
+			if paramStatus(r) {
+				Data.Users, Data.Success, err = AMIUsers(pbxfile, AgentUrl)
+				if err == nil {
+					err, Data.Ami, Data.Http = AMIStatus(AgentUrl)
+				}
+				if err != nil {
+					Data.Message = "Error: " + err.Error()
+					Data.MessageType = "errormessage"
+				}
+				err = mytemplate.ExecuteTemplate(w, "AMIConfig.html", Data)
+			}
 			if err != nil {
 				WriteLog("Error in AMIConfig execute template: " + err.Error())
 				fmt.Fprintf(w, err.Error())
@@ -1091,7 +1107,19 @@ type AMIUserType struct {
 	Default bool
 }
 
-func AMIUsers(Aurl string) (users []AMIUserType, success bool, err error) {
+func getDefault(user, pass, pbxfile string) (res bool) {
+	suser := GetConfigValueFrom(pbxfile, "amiuser", "")
+	spass := GetConfigValueFrom(pbxfile, "amipass", "")
+	if suser == user && spass == pass {
+		res = true
+	} else {
+		res = false
+	}
+
+	return res
+}
+
+func AMIUsers(pbxfile, Aurl string) (users []AMIUserType, success bool, err error) {
 	var bytes []byte
 	bytes, err = restCallURL(Aurl+"GetAMIUsersInfo", nil)
 	if err == nil {
@@ -1106,15 +1134,31 @@ func AMIUsers(Aurl string) (users []AMIUserType, success bool, err error) {
 						spl1 := strings.Split(spl[i], ":")
 						user := strings.ReplaceAll(spl1[0], "[", "")
 						user = strings.ReplaceAll(user, "]", "")
-						fmt.Println(spl1)
-						users = append(users, AMIUserType{User: user, Spl: spl1})
+						users = append(users, AMIUserType{User: user, Spl: spl1, Default: getDefault(user, spl1[1], pbxfile)})
 					}
-				} else {
-					//"<p class=infomessage >There is no AMI User <a href=AMIConfig?adf=yes>Add AMI User</a></p>"
 				}
 			} else {
-				//out.println("<p class=errormessage >Error : " + res.get("message").toString() + "</p>")
+				err = errors.New(res.Message)
 			}
+		}
+	}
+	return
+}
+
+func AMIStatus(Aurl string) (err error, ami /*amiht,*/, amihttp bool) {
+	var spl []string
+	var data []byte
+	data, err = restCallURL(Aurl+"GetAMIStatus", nil)
+	if err == nil {
+		var res ResponseType
+		json.Unmarshal(data, &res)
+		if res.Success {
+			spl = strings.Split(res.Result, ":")
+			ami = spl[0] == "ok"
+			//amiht = spl[1] == "ok"
+			amihttp = spl[2] == "ok"
+		} else {
+			err = errors.New(res.Message)
 		}
 	}
 	return

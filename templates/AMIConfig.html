@@ -1,4 +1,6 @@
-{{ define "def" }}
+{{ template "header" . }}
+<br>
+<h2>AMI Configurations</h2>
 {{ if .Success}}
 <h4>AMI Users</h4><a href='AMIConfig?adf=yes'>Add New User</a>
 <table style=margin-top:10px class=dtable>
@@ -16,14 +18,28 @@
 <td>{{ index .Spl 2}}</td>
 <td>{{ index .Spl 3}}</td>
 <td><a href="AMIConfig?edf={{index .Spl 0}}">Edit</a></td>
-<td>getDefault(user, {{index .Spl 0}}, pbxfile)</td>
+<td>
+{{ if .Default}}
+Default
+{{else}}
+<a href="AMIConfig?def=[{{.User}}]">Set Default</a>
+{{end}}
+</td>
 </tr>
 {{end}}
 </table><hr/>
+{{else}}
+<p class="infomessage">There is no AMI User <a href="AMIConfig?adf=yes">Add AMI User</a></p>
 {{end}}
+<h4>AMI Status</h4>
+{{ if .Ami}}
+<p style=margin-left:20px >AMI Status:<span class=infomessage> OK </span></p>
+{{else}}
+<p style=margin-left:20px >AMI Status:<span class=errormessage> AMI or AMI over Http is disabled </span></p>
 {{end}}
-{{ template "header" . }}
-<br>
-<h2>AMI Configurations</h2>
-{{ template "def" . }}
+{{ if .Http}}
+<p style=margin-left:20px >Asterisk HTTP Server Status:<span class=infomessage> OK </span></p>
+{{else}}
+<p style=margin-left:20px >Asterisk HTTP Server Status:<span class=errormessage> Disabled </span></p>
+{{end}}
 {{ template "footer" . }}
