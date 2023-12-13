@@ -1060,6 +1060,9 @@ type AMIConfigType struct {
 	Success   bool
 	Connected bool
 	Users     []AMIUserType
+	//edf
+	Spl  []string
+	User string
 }
 
 func paramStatus(request *http.Request) bool {
@@ -1113,46 +1116,48 @@ func doAddAMIUser(r *http.Request, w http.ResponseWriter, Aurl string) (err erro
 	return
 }
 
-func editAMIUserForm(Aurl, uname string) {
-	/*String spl[],user;
-	         JSONObject obj=new JSONObject();
-	                    obj.put("Username", uname);
-	                    String requestText = obj.toJSONString();
-	                    String resultText = General.restCallURL(url + "GetAMIUserInfo", requestText);
-	          JSONParser parser = new JSONParser();
-	          JSONObject res = (JSONObject) parser.parse(resultText);
-	                    boolean success = (Boolean.valueOf(res.get("success").toString()));
-	                    if(success)
-	                    {
-	                         String result=res.get("result").toString();
-	                        spl=result.split(":");
-	                        user=spl[0].replace("[", "");
-	                        user=user.replace("]", "");
-	         out.print("<h4>Edit "+user+" </h4>");
-	        out.println("<form method=POST >");
-	        out.println("<table>");
-	        out.println("<tr><td>AMI Username </td><td><input type=text name=user value="+user+"  size=30 required/></td></td>");
+func editAMIUserForm(Aurl, uname string) (err error, spl []string, user string) {
+	obj := make(map[string]string)
+	obj["Username"] = uname
+	data, _ := json.Marshal(obj)
+	var response []byte
+	response, err = restCallURL(Aurl+"GetAMIUserInfo", data)
+	if err == nil {
+		var res ResponseType
+		json.Unmarshal(response, &res)
+		if res.Success {
+			spl = strings.Split(res.Result, ":")
+			user = strings.ReplaceAll(spl[0], "[", "")
+			user = strings.ReplaceAll(user, "]", "")
+		} else {
+			err = errors.New(res.Message)
+		}
+	}
+	return
+}
 
-	        out.println("<tr><td>AMI Secret</td>");
-	        out.println("<td><input type=passwoed name=sec value="+spl[1]+" size=30 required/></td></tr>");
-
-	        out.println("<tr><td>AMI Read Permission </td>");
-	        out.println("<td><input type=text name=read size=30 value="+spl[2]+" required/></td></td>");
-
-	        out.println("<tr><td>AMI Write Permission</td>");
-	        out.println("<td><input type=text name=write size=30 value="+spl[3]+" required/></td></tr>");
-	        out.println("<tr><td>AMI Aditional Configuration:</td>");
-	        out.println("<td><textarea rows = 5 cols=40 name=addi />");
-
-		out.println(spl[4]);
-		out.println("</textarea></td></tr>");
-
-	        out.println("<tr><td><input type=submit name=mok value=OK required/></td><td><input type=hidden name=cuser value="+spl[0]+" required/></td></tr>");
-	        out.println("</table>");
-	        out.println("</form>");
-	                    }else
-	                        out.println("<p class=errormessage >Error: "+res.get("message").toString()+"</p>");
-	*/
+func doModAMIUser(r *http.Request, w http.ResponseWriter, Aurl string) (err error) {
+	obj := make(map[string]string)
+	obj["Username"] = r.FormValue("cuser")
+	obj["NUsername"] = r.FormValue("user")
+	obj["Secret"] = r.FormValue("sec")
+	obj["Read"] = r.FormValue("read")
+	obj["Write"] = r.FormValue("write")
+	obj["Addi"] = r.FormValue("addi")
+	req, _ := json.Marshal(obj)
+	var data []byte
+	data, err = restCallURL(Aurl+"ModifyAMIUser", req)
+	if err == nil {
+		var res ResponseType
+		json.Unmarshal(data, &res)
+		if res.Success {
+			r.Form = make(url.Values)
+			http.Redirect(w, r, "AMIConfig", http.StatusTemporaryRedirect)
+		} else {
+			err = errors.New("Error in Adding AMI User: " + res.Message)
+		}
+	}
+	return
 }
 
 func AMIConfig(w http.ResponseWriter, r *http.Request) {
@@ -1198,8 +1203,20 @@ func AMIConfig(w http.ResponseWriter, r *http.Request) {
 			if r.FormValue("adf") != "" {
 				err = mytemplate.ExecuteTemplate(w, "AMIConfigAdf.html", Data)
 			}
+			if r.FormValue("mok") != "" {
+				err = doModAMIUser(r, w, AgentUrl)
+				if err != nil {
+					Data.Message = "Error: " + err.Error()
+					Data.MessageType = "errormessage"
+				}
+			}
 			if r.FormValue("edf") != "" {
-				editAMIUserForm(AgentUrl, r.FormValue("edf"))
+				err, Data.Spl, Data.User = editAMIUserForm(AgentUrl, r.FormValue("edf"))
+				if err != nil {
+					Data.Message = "Error: " + err.Error()
+					Data.MessageType = "errormessage"
+				}
+				err = mytemplate.ExecuteTemplate(w, "AMIConfigEdf.html", Data)
 			}
 			if err != nil {
 				WriteLog("Error in AMIConfig: " + err.Error())
