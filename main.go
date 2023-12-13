@@ -8,7 +8,7 @@ import (
 
 var mytemplate *template.Template
 
-const Version = "0.6.9 10Dec"
+const Version = "0.7 13Dec"
 
 func main() {
 	mytemplate = template.Must(template.ParseGlob("templates/*.html"))

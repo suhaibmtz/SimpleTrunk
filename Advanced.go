@@ -561,6 +561,7 @@ func Dialplan(w http.ResponseWriter, r *http.Request) {
 			}
 			if message != "" {
 				Data.Message = "Error: " + message
+				Data.MessageType = "errormessage"
 			}
 
 			nodes := GetNodes(res.Content)
@@ -911,7 +912,6 @@ func UploadSound(w http.ResponseWriter, r *http.Request) {
 			message := r.FormValue("message")
 
 			if message != "" {
-				println(message)
 				var obj ReciveFileResponseType
 				err := json.Unmarshal([]byte(message), &obj)
 				if err != nil {
@@ -943,7 +943,8 @@ func UploadSound(w http.ResponseWriter, r *http.Request) {
 			Data.Dir = dir
 			filesRes, err := listFiles(AgentUrl, dir)
 			if err != nil {
-				message = err.Error()
+				Data.Message = err.Error()
+				Data.MessageType = "errormessage"
 			} else {
 				files := filesRes.Files
 				for i := 0; i < len(files); i++ {
@@ -1054,14 +1055,104 @@ func UploadSoundFile(w http.ResponseWriter, r *http.Request) {
 type AMIConfigType struct {
 	HeaderType
 	// status and users
-	Ami     bool
-	Http    bool
-	Success bool
-	Users   []AMIUserType
+	Ami       bool
+	Http      bool
+	Success   bool
+	Connected bool
+	Users     []AMIUserType
 }
 
 func paramStatus(request *http.Request) bool {
 	return request.FormValue("adf") == "" && request.FormValue("edf") == ""
+}
+
+func setDefault(w http.ResponseWriter, Aurl, pbxfile string, r *http.Request, uname string) (err error) {
+	var spl []string
+	var user string
+	obj := make(map[string]string)
+	obj["Username"] = uname
+	bytes, _ := json.Marshal(obj)
+	var response []byte
+	response, err = restCallURL(Aurl+"GetAMIUserInfo", bytes)
+	if err == nil {
+		var res ResponseType
+		json.Unmarshal(response, &res)
+		if res.Success {
+			spl = strings.Split(res.Result, ":")
+			user = strings.ReplaceAll(spl[0], "[", "")
+			user = strings.ReplaceAll(user, "]", "")
+			SetConfigValueTo(pbxfile, "amiuser", user)
+			SetConfigValueTo(pbxfile, "amipass", spl[1])
+			http.Redirect(w, r, "AMIConfig", http.StatusTemporaryRedirect)
+		} else {
+			err = errors.New(res.Message)
+		}
+	}
+	return
+}
+
+func doAddAMIUser(r *http.Request, w http.ResponseWriter, Aurl string) (err error) {
+	obj := make(map[string]string)
+	obj["Username"] = r.FormValue("user")
+	obj["Secret"] = r.FormValue("sec")
+	obj["Read"] = r.FormValue("read")
+	obj["Write"] = r.FormValue("write")
+	obj["Addi"] = r.FormValue("addi")
+	bytes, _ := json.Marshal(obj)
+	var response []byte
+	response, err = restCallURL(Aurl+"AddAMIUser", bytes)
+	if err == nil {
+		var res ResponseType
+		json.Unmarshal(response, &res)
+		if res.Success {
+			http.Redirect(w, r, "AMIConfig", http.StatusTemporaryRedirect)
+		} else {
+			err = errors.New("Error in Adding AMI User: " + res.Message)
+		}
+	}
+	return
+}
+
+func editAMIUserForm(Aurl, uname string) {
+	/*String spl[],user;
+	         JSONObject obj=new JSONObject();
+	                    obj.put("Username", uname);
+	                    String requestText = obj.toJSONString();
+	                    String resultText = General.restCallURL(url + "GetAMIUserInfo", requestText);
+	          JSONParser parser = new JSONParser();
+	          JSONObject res = (JSONObject) parser.parse(resultText);
+	                    boolean success = (Boolean.valueOf(res.get("success").toString()));
+	                    if(success)
+	                    {
+	                         String result=res.get("result").toString();
+	                        spl=result.split(":");
+	                        user=spl[0].replace("[", "");
+	                        user=user.replace("]", "");
+	         out.print("<h4>Edit "+user+" </h4>");
+	        out.println("<form method=POST >");
+	        out.println("<table>");
+	        out.println("<tr><td>AMI Username </td><td><input type=text name=user value="+user+"  size=30 required/></td></td>");
+
+	        out.println("<tr><td>AMI Secret</td>");
+	        out.println("<td><input type=passwoed name=sec value="+spl[1]+" size=30 required/></td></tr>");
+
+	        out.println("<tr><td>AMI Read Permission </td>");
+	        out.println("<td><input type=text name=read size=30 value="+spl[2]+" required/></td></td>");
+
+	        out.println("<tr><td>AMI Write Permission</td>");
+	        out.println("<td><input type=text name=write size=30 value="+spl[3]+" required/></td></tr>");
+	        out.println("<tr><td>AMI Aditional Configuration:</td>");
+	        out.println("<td><textarea rows = 5 cols=40 name=addi />");
+
+		out.println(spl[4]);
+		out.println("</textarea></td></tr>");
+
+	        out.println("<tr><td><input type=submit name=mok value=OK required/></td><td><input type=hidden name=cuser value="+spl[0]+" required/></td></tr>");
+	        out.println("</table>");
+	        out.println("</form>");
+	                    }else
+	                        out.println("<p class=errormessage >Error: "+res.get("message").toString()+"</p>");
+	*/
 }
 
 func AMIConfig(w http.ResponseWriter, r *http.Request) {
@@ -1078,6 +1169,13 @@ func AMIConfig(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 			var err error
+			if r.FormValue("def") != "" {
+				err = setDefault(w, AgentUrl, pbxfile, r, r.FormValue("def"))
+				if err != nil {
+					Data.Message = "Error: " + err.Error()
+					Data.MessageType = "errormessage"
+				}
+			}
 			if paramStatus(r) {
 				Data.Users, Data.Success, err = AMIUsers(pbxfile, AgentUrl)
 				if err == nil {
@@ -1087,10 +1185,24 @@ func AMIConfig(w http.ResponseWriter, r *http.Request) {
 					Data.Message = "Error: " + err.Error()
 					Data.MessageType = "errormessage"
 				}
+				Data.Connected = err == nil
 				err = mytemplate.ExecuteTemplate(w, "AMIConfig.html", Data)
 			}
+			if r.FormValue("aok") != "" {
+				err = doAddAMIUser(r, w, AgentUrl)
+				if err != nil {
+					Data.Message = "Error: " + err.Error()
+					Data.MessageType = "errormessage"
+				}
+			}
+			if r.FormValue("adf") != "" {
+				err = mytemplate.ExecuteTemplate(w, "AMIConfigAdf.html", Data)
+			}
+			if r.FormValue("edf") != "" {
+				editAMIUserForm(AgentUrl, r.FormValue("edf"))
+			}
 			if err != nil {
-				WriteLog("Error in AMIConfig execute template: " + err.Error())
+				WriteLog("Error in AMIConfig: " + err.Error())
 				fmt.Fprintf(w, err.Error())
 			}
 		} else {
