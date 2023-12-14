@@ -12,7 +12,10 @@ import (
 
 func WriteLog(event string) {
 	fmt.Println(event)
-	codeutils.WriteToLog(event, simpletrunkPath+"/log/simpletrunk")
+	err := codeutils.WriteToLog(event, simpletrunkPath+"/log/simpletrunk")
+	if err != nil {
+		fmt.Println("WriteLog Error: " + err.Error())
+	}
 }
 
 func GetConfigValueFrom(file, param, def string) (value string) {
@@ -44,6 +47,7 @@ type ResponseType struct {
 	Success   bool   `json:"success"`
 	Errorcode int    `json:"errorcode"`
 	Message   string `json:"message"`
+	Result    string `json:"result"`
 }
 
 type GetFileResponseType struct {

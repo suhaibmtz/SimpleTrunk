@@ -1,0 +1,12 @@
+{{ template "header" . }}
+<br>
+<a href="Files?file=asterisk.conf">View (Read only)</a>
+<h4>Edit file: <b>[{{.FileName}}]</b> </h4>
+<form method=POST>
+<input type=hidden name=filename value={{.FileName}} />
+<input type=submit value='Save modifications' name=save class='button' />
+<textarea cols=140 rows = 60 font name=content >
+{{.Content}}
+</textarea><br/>
+</form>
+{{ template "footer" . }}

@@ -8,7 +8,7 @@ func PBX(w http.ResponseWriter, r *http.Request) {
 	exist, User := CheckSession(r)
 	if exist {
 		Header := GetHeader(User.Name, "PBX", r)
-		err := mytemplate.ExecuteTemplate(w, "home.html", Header)
+		err := mytemplate.ExecuteTemplate(w, "pbxpage.html", Header)
 		if err != nil {
 			WriteLog("Error in Home execute template: " + err.Error())
 		}

@@ -1,0 +1,32 @@
+{{ template "header" . }}
+{{ if .Command}}
+<p class=warnmessage>
+<a href='Commands?command={{.Command}}&ret=1'>{{.Caption}}</a></br></p>
+{{end}}
+<h4>Configuration file: <b>[{{.FileName}}]</b> </h4>
+{{ if eq .NodeName "" }}
+Adding new node
+<form method=POST>
+Node name<input type=text name=nodename /><br/>
+Text <br/><textarea cols=100 rows=10 name=content >
+</textarea></br>
+<input type=submit name=add value='Add Node' class='button' />
+</form>
+{{else}}
+<h3>Edit Node: <b>{{.NodeName}}</b> </h3>
+<form method=POST>
+{{ if .Edit }}
+<br/><input type=submit value=Save name=save id=button class='button' />
+
+<textarea cols=120 rows = 20 font name=content >
+{{.Content}}
+</textarea>
+{{else}}
+<input type=submit value=Edit name=edit  class='button'  />
+<pre>
+{{.Content}}
+</pre>
+{{end}}
+</form>
+{{end}}
+{{ template "footer" . }}

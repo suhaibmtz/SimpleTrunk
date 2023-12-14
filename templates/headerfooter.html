@@ -35,7 +35,7 @@
                     <td class=titletd style="color:black;background-color: #DDDDFF; vertical-align:bottom;font-size:30px;">
                         &emsp;Simple Trunk&emsp; </td>
             <td class=titletd><td bgcolor=#DDDDFF style='color:black;vertical-align:bottom;'>
-                {{.LogoutText}} <a href="Logout">Logout</a></td>
+                {{.LogoutText}}&emsp; <a href="Logout">Logout</a></td>
             <td bgcolor=#DDDDFF style='vertical-align:bottom;'><font color=green><b>{{.SelectedPBX.Title}}</b></font></td>
             <td bgcolor=#DDDDFF style='vertical-align:bottom;font-size:12px; color:gray;'>
                 Version {{.Version}}
@@ -61,6 +61,7 @@
              location='SelectPBX?pbx=' + sel.value;  
             }
             </script>
+            &emsp;
             <select name="pbx" onchange="selectPBX(this)">
             <option>--Select PBX--</option>
             {{ $selectedPBX := .SelectedPBX.FileName }}

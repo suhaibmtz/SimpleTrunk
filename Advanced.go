@@ -1,16 +1,34 @@
 package main
 
 import (
+	"encoding/base64"
 	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
 	"net/http"
 	"net/url"
+	"os"
+	"strconv"
 	"strings"
+	"time"
 )
+
+var AdvancedTabs = []TabType{
+	{Value: "Status", Name: "Status"},
+	{Value: "Files", Name: "Files"},
+	{Value: "SIPNodes", Name: "SIP"},
+	{Value: "Dialplan", Name: "Dial plans"},
+	{Value: "Commands", Name: "CLI commands"},
+	{Value: "AMI", Name: "AMI commands"},
+	{Value: "Terminal", Name: "Terminal"},
+	{Value: "Logs", Name: "Logs"},
+	{Value: "Config", Name: "Configuration"},
+}
 
 func GetAdvancedHeader(name, page, page2 string, r *http.Request) (Data HeaderType) {
 	Data = GetHeader(name, "Advanced", r)
 	AdvancedTabs := TabsType{Selected: page, Tabs: AdvancedTabs}
-	Data.Tabs = append(Data.Tabs, AdvancedTabs)
 	var Tabs TabsType
 	switch page {
 	case "Status":
@@ -40,7 +58,21 @@ func GetAdvancedHeader(name, page, page2 string, r *http.Request) (Data HeaderTy
 				{Value: "?file=all", Name: "All Files"},
 			},
 		}
+	case "EditFile":
+		AdvancedTabs.Selected = "Files"
+	case "CLI commands":
+		Tabs = TabsType{Selected: page2, Text: "CLI Commands",
+			Tabs: []TabType{
+				{Value: "?command=corereload", Name: "core reload"},
+				{Value: "?command=sipreload", Name: "sip reload"},
+				{Value: "?command=dialplanreload", Name: "dialplan reload"},
+				{Value: "?command=version", Name: "version"},
+				{Value: "?command=help", Name: "Help"},
+			},
+		}
+
 	}
+	Data.Tabs = append(Data.Tabs, AdvancedTabs)
 	if Tabs.Text != "" {
 		Data.Tabs = append(Data.Tabs, Tabs)
 	}
@@ -200,7 +232,17 @@ func BackupFiles(w http.ResponseWriter, r *http.Request) {
 			} else if backupFileName != "" {
 				Data.FileName = backupFileName
 				Data.OrignalFile = backupFileName[0 : strings.Index(backupFileName, "conf")+4]
-				doRetrieve(r, Data.OrignalFile, AgentUrl)
+				err, ret := doRetrieve(r, Data.OrignalFile, AgentUrl)
+				if ret {
+					if err == nil {
+						WriteLog(User.Name + " Retrieved: " + Data.OrignalFile + " from " + backupFileName)
+						Data.Message = "File Replaced"
+						Data.MessageType = "infomessage"
+					} else {
+						Data.Message = err.Error()
+						Data.MessageType = "errormessage"
+					}
+				}
 				obj["filename"] = "/etc/asterisk/backup/" + backupFileName
 				bytes, err := json.Marshal(obj)
 				if err != nil {
@@ -226,16 +268,29 @@ func BackupFiles(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-type CompareLineType struct {
-	Original string
-	BackUp   string
+type LineType struct {
+	LineN     int
+	Line      string
+	Color     string
+	Span      string
+	SpanColor string
 }
 
 type CompareFilesType struct {
 	HeaderType
-	Lines    []CompareLineType
-	Original string
-	BackUp   string
+	Original    string
+	BackUp      string
+	OrgLines    []LineType
+	BackUpLines []LineType
+}
+
+type DiffPosition struct {
+	Type              string
+	FirstFileStartPos int
+	FirstFileEndPos   int
+
+	SecondFileStartPos int
+	SecondFileEndPos   int
 }
 
 func CompareFiles(w http.ResponseWriter, r *http.Request) {
@@ -245,41 +300,45 @@ func CompareFiles(w http.ResponseWriter, r *http.Request) {
 		pbx := GetCookieValue(r, "file")
 		pbxfile := GetPBXDir() + pbx
 		if FileExist(pbxfile) {
-			Data := GetAdvancedHeader(User.Name, "Comapre", "", r)
+			var Data CompareFilesType
+			Data.HeaderType = GetAdvancedHeader(User.Name, "Comapre", "", r)
 			r.ParseForm()
 			originalFileName := r.FormValue("originalfilename")
 			backupFileName := r.FormValue("backupfilename")
-			if r.FormValue("CompareFiles") != "" {
+			if r.FormValue("CompareFiles") != "" && originalFileName != "" && backupFileName != "" {
+				url := GetConfigValueFrom(pbxfile, "url", "")
+				Org, err := GetFileContents(url, "/etc/asterisk/"+originalFileName)
+				if err != nil {
+					WriteLog("Error in CompareFiles GetFileContent Original: " + err.Error())
+				}
+				Back, _ := GetFileContents(url, "/etc/asterisk/backup/"+backupFileName)
 
-				if originalFileName != "" && backupFileName != "" {
-					url := GetConfigValueFrom(pbxfile, "url", "")
-					var obj = map[string]string{}
-					obj["filename"] = "/etc/asterisk/" + originalFileName
-					bytes, _ := json.Marshal(obj)
-
-					Org, err := GetFileContents(url, obj["filename"], bytes)
-					if err != nil {
-						WriteLog("Error in CompareFiles GetFileContent Original: " + err.Error())
-					}
-					obj["filename"] = "/etc/asterisk/backup/" + backupFileName
-					bytes, _ = json.Marshal(obj)
-
-					Back, _ := GetFileContents(url, obj["filename"], bytes)
-
-					command := "diff -w -b " + "/etc/asterisk/backup/" + backupFileName + "  /etc/asterisk/" + originalFileName
-					obj["command"] = command
-					bytes, _ = json.Marshal(obj)
+				command := "diff -w -b " + "/etc/asterisk/backup/" + backupFileName + "  /etc/asterisk/" + originalFileName
+				obj := make(map[string]string)
+				obj["command"] = command
+				bytes, err := json.Marshal(obj)
+				if err != nil {
+					WriteLog("Error in CompareFiles marshal diff object: " + err.Error())
+				} else {
 					bytes, err = restCallURL(url+"Shell", bytes)
 					if err != nil {
 						Data.Message = "Error: " + err.Error()
 						Data.MessageType = "errormessage"
-					} else {
-						displayCompareFile(Org, Back, originalFileName, backupFileName)
-
 					}
+					var res ResponseType
+					err = json.Unmarshal(bytes, &res)
+					if err != nil {
+						WriteLog("Error in CompareFiles Unmarshal Response: " + err.Error())
+					}
+					dpArr := diff(res)
+					Data.Original = originalFileName
+					Data.BackUp = backupFileName
+					Data.OrgLines, Data.BackUpLines = CompareFile(Org, Back, originalFileName, backupFileName, dpArr)
 				}
+			} else {
+				http.Redirect(w, r, "Files", http.StatusTemporaryRedirect)
 			}
-			err := mytemplate.ExecuteTemplate(w, "advanced.html", Data)
+			err := mytemplate.ExecuteTemplate(w, "Compare.html", Data)
 			if err != nil {
 				WriteLog("Error in Advanced execute template: " + err.Error())
 			}
@@ -290,173 +349,946 @@ func CompareFiles(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "login", http.StatusTemporaryRedirect)
 	}
 }
-func displayCompareFile(final PrintWriter out, JSONObject firstResObj,JSONObject secondResObj,  String originalFileName , String backupFileName , ArrayList<DiffPosition> dpArr) {
-        
-        String originalContent = "";
-        if (Boolean.valueOf(firstResObj.get("success").toString())) {
-            originalContent = firstResObj.get("content").toString();
-        }
-        String backupContent = "";
-        if (Boolean.valueOf(secondResObj.get("success").toString())) {
-            backupContent = secondResObj.get("content").toString();
-        }
-        
-        
-        String[] originalContentArr = originalContent.split("\\r?\\n" , -1);
-        String[] backupContentArr = backupContent.split("\\r?\\n" , -1);
-        
-        for (int i = 0 ; i < backupContentArr.length ; i++ ){
-            //out.println("<p>"+ i+"  "+backupContentArr[i]+"</p>");
-        }
-        
-        //int contentLength = (originalContentArr.length > backupContentArr.length)? originalContentArr.length:backupContentArr.length;
-            
-        out.println("<br><br><br>");
-        out.println("<div style=' margin:auto; overflow:hidden;' >");
-        
-            out.println("<table width='50%' style='float: left; display: block;' >");
-                out.println("<tbody>");
-                    
-                    out.println("<tr> <th> </th>");
-                    out.println(" <th> <h3>"+originalFileName+"</h3></th> </tr>");
-                    
-                        int originCount = 0 ;              
-                        for (int i = 0;i<originalContentArr.length; i++ ){
-                           
-                            if(i  >= originalContentArr.length){
-                                out.println("<tr>");
-                                out.println("<td>"+(i+1) +"</td>");
-                                out.println("<td>  \t </td>");
-                                out.println("</tr>");
-                            }else{
-                                if (dpArr.size() == 0 ){
-                                    
-                                    out.println("<tr>");
-                                    out.println("<td>"+(i+1) +"</td>");
-                                    out.println("<td>"+originalContentArr[i] +" </td>");
-                                    out.println("</tr>");                                   
-                                }else{
-                                    if (dpArr.get(originCount).secondFileEndPos  <= 0){
-                                        originCount++ ;
-                                    } 
-                                    int startPoint = dpArr.get(originCount).secondFileStartPos -1  ;
-                                    int endPoint = dpArr.get(originCount).secondFileEndPos    ;
-                                    if (startPoint == i ){
-                                        while (startPoint < endPoint ){
-                                            out.println("<tr>");
-                                            out.println("<td>"+(i+1) +"</td>");
-                                            switch(dpArr.get(originCount).type){
-                                                case 'a':
-                                                    out.println("<td bgcolor='#B4FFB4'>"+originalContentArr[i] +" </td>");
-                                                    break ;
-                                                case 'd':
-                                                    //out.println("<td bgcolor='#FFA0B4'>"+originalContentArr[i] +" </td>");
-                                                    out.println("<td>"+originalContentArr[i] +"<span style='color:#ff3658 ;'> ▼</span>  </td>");
-                                                    break ;
-                                                case 'c':
-                                                    out.println("<td bgcolor='#A0C8FF'>"+originalContentArr[i] +" </td>");
-                                                    break ;                                                
-                                           }
 
-                                            out.println("</tr>");
-                                            startPoint++ ;
-                                           if (startPoint < endPoint){
-                                               i++ ;
-                                           }
+type EditFileType struct {
+	HeaderType
+	FileName string
+	Content  string
+}
 
-                                        }
-                                        if (originCount < dpArr.size()-1 ){
-                                             originCount++ ;
-                                        }
+func EditFile(w http.ResponseWriter, r *http.Request) {
+	exist, User := CheckSession(r)
+	if exist {
+		pbxfile := GetPBXDir() + GetCookieValue(r, "file")
+		if FileExist(pbxfile) {
+			var Data EditFileType
+			Data.HeaderType = GetAdvancedHeader(User.Name, "EditFile", "", r)
+			Data.FileName = r.FormValue("filename")
+			AgentUrl := GetConfigValueFrom(pbxfile, "url", "")
+			Response, err := GetFile(AgentUrl, Data.FileName)
+			if err == nil {
+				Data.Content = Response.Content
+			} else {
+				Data.Message = err.Error()
+				Data.MessageType = "errormessage"
+			}
+			if r.FormValue("save") != "" {
+				res, err := SaveRemoteFile(AgentUrl, Data.FileName, r.FormValue("content"))
+				if err == nil {
+					if res.Success {
+						Data.Message = "File Saved"
+						Data.MessageType = "infomessage"
+					} else {
+						Data.Message = "Error: " + err.Error()
+						Data.MessageType = "errormessage"
+					}
+				} else {
+					Data.Message = err.Error()
+					Data.MessageType = "errormessage"
+				}
+			}
+			err = mytemplate.ExecuteTemplate(w, "EditFile.html", Data)
+			if err != nil {
+				WriteLog("Error in EditFile execute template: " + err.Error())
+			}
+		} else {
+			http.Redirect(w, r, "Files", http.StatusTemporaryRedirect)
+		}
+	} else {
+		http.Redirect(w, r, "login", http.StatusTemporaryRedirect)
+	}
+}
 
-                                   }else{
-                                       out.println("<tr>");
-                                       out.println("<td>"+(i+1) +"</td>");
-                                       out.println("<td>"+originalContentArr[i] +" </td>");
-                                       out.println("</tr>");
-                                   }                                    
-                                    
-                                    
-                                }
+type SipNodesType struct {
+	HeaderType
+	Nodes []string
+}
 
-                               
-                             }
-                        }   
-                
-                
-                out.println("</tbody>");
-                out.println("</table>");       
-                
-                        
-                            /////////////////////////////////////////////////////
+func SIPNodes(w http.ResponseWriter, r *http.Request) {
+	exist, User := CheckSession(r)
+	if exist {
+		pbxfile := GetPBXDir() + GetCookieValue(r, "file")
+		if FileExist(pbxfile) {
+			var Data SipNodesType
+			Data.HeaderType = GetAdvancedHeader(User.Name, "SIP", "", r)
+			AgentUrl := GetConfigValueFrom(pbxfile, "url", "")
+			if AgentUrl != "" {
+				if string(AgentUrl[len(AgentUrl)-1]) != "/" {
+					AgentUrl += "/"
+				}
+			}
 
-                            
-                            
-            out.println("<table width='50%'; style='float: left; display: block';>");
-                out.println("<tbody>");
-                    out.println("<tr> <th>  </th> ");
-                    out.println(" <th> <h3>"+backupFileName+"</h3></th> </tr>");
-                        int backupCount = 0 ;                             
-                        for (int i = 0;i< backupContentArr.length ; i++ ){  
-                            
-                            if(i  >= backupContentArr.length){
-                                out.println("<tr>");
-                                out.println("<td>"+(i+1) +"</td>");
-                                out.println("<td>  \t </td>");
-                                out.println("</tr>");
-                            }else{
-                                if (dpArr.size() == 0 ){
-                                    
-                                    out.println("<tr>");
-                                    out.println("<td>"+(i+1) +"</td>");
-                                    out.println("<td>"+backupContentArr[i] +" </td>");
-                                    out.println("</tr>");                                   
-                                }else{
-                                   if (dpArr.get(backupCount).firstFileEndPos  <= 0){
-                                        backupCount++ ;
-                                    } 
-                                    int startpoint = dpArr.get(backupCount).firstFileStartPos -1  ;
-                                    int endPoint = dpArr.get(backupCount).firstFileEndPos   ;
-                                    if (startpoint== i ){
-                                        while (startpoint < endPoint){
-                                           out.println("<tr>");
-                                           out.println("<td>"+(i+1) +"</td>");
-                                           switch(dpArr.get(backupCount).type){
-                                                case 'a':
-                                                    //out.println("<td bgcolor='#B4FFB4'>"+backupContentArr[i] +" </td>");
-                                                    out.println("<td>"+backupContentArr[i] +"<span style='color:#02a322 ;'> ▼</span>  </td>");
-                                                    break ;
-                                                case 'd':
-                                                    out.println("<td bgcolor='#FFA0B4'>"+backupContentArr[i] +" </td>");
-                                                    break ;
-                                                case 'c':
-                                                    out.println("<td bgcolor='#A0C8FF'>"+backupContentArr[i] +" </td>");
-                                                    break ;
+			Res, err := GetFile(AgentUrl, "sip.conf")
+			if err != nil {
+				Data.Message = "Error: " + err.Error()
+				Data.MessageType = "errormessage"
+			} else {
+				if Res.Success {
+					nodes := GetNodes(Res.Content)
+					reverseStr := GetCookieValue(r, "reverse")
+					reverse := reverseStr == "yes"
+					if reverse {
+						for i := len(nodes) - 1; i >= 0; i-- {
+							Data.Nodes = append(Data.Nodes, nodes[i])
+						}
+					} else {
+						Data.Nodes = nodes
+					}
 
-                                           }
+				}
+			}
+			err = mytemplate.ExecuteTemplate(w, "sipnodes.html", Data)
+			if err != nil {
+				WriteLog("Error in sipNodes execute template: " + err.Error())
+			}
+		} else {
+			http.Redirect(w, r, "Home", http.StatusTemporaryRedirect)
+		}
+	} else {
+		http.Redirect(w, r, "login", http.StatusTemporaryRedirect)
+	}
+}
 
-                                           out.println("</tr>");
-                                           startpoint++ ;
-                                           if (startpoint < endPoint){
-                                               i++ ;
-                                           }
-                                           
-                                        }
-                                       if (backupCount < dpArr.size()-1){
-                                           backupCount++ ;
-                                       }
+type EditNodeType struct {
+	HeaderType
+	FileName string
+	NodeName string
+	Content  string
+	Command  string
+	Caption  string
+	Edit     bool
+}
 
+func EditNode(w http.ResponseWriter, r *http.Request) {
+	exist, User := CheckSession(r)
+	if exist {
+		tabName := "SIP"
+		fileName := r.FormValue("filename")
+		if !strings.Contains(fileName, "sip.") {
+			tabName = "Dial plans"
+		}
+		pbxfile := GetPBXDir() + GetCookieValue(r, "file")
+		if FileExist(pbxfile) {
+			var Data EditNodeType
+			Data.HeaderType = GetAdvancedHeader(User.Name, tabName, "", r)
 
-                                    }else{
-                                       out.println("<tr>");
-                                       out.println("<td>"+(i+1) +"</td>");
-                                       out.println("<td>"+backupContentArr[i] +" </td>");
-                                       out.println("</tr>");
-                                    }                        
-                                }
-                            }                                                          
-                        }
-                out.println("</tbody>");
-            out.println("</table>");  
-        out.println("</div> <br>");    
-    }
+			Data.FileName = fileName
+			AgentUrl := GetConfigValueFrom(pbxfile, "url", "")
+			if AgentUrl != "" {
+				if string(AgentUrl[len(AgentUrl)-1]) != "/" {
+					AgentUrl += "/"
+				}
+			}
+
+			Data.NodeName = r.FormValue("nodename")
+			if !strings.Contains(Data.NodeName, "[") && Data.NodeName != "" {
+				Data.NodeName = "[" + Data.NodeName + "]"
+			}
+
+			if Data.NodeName != "" {
+				if r.FormValue("add") != "" {
+					message := addNewNode(fileName, Data.NodeName, r.FormValue("content"), AgentUrl)
+					if message == "" {
+						WriteLog(User.Name + " Added: " + Data.NodeName)
+						Data.Message = "New node " + Data.NodeName + " has been added"
+						Data.MessageType = "infomessage"
+					} else {
+						Data.Message = "Error: " + message
+						Data.MessageType = "errormessage"
+					}
+				}
+				Data.Edit = r.FormValue("edit") != ""
+				res, err := SaveNode(r, fileName, Data.NodeName, AgentUrl)
+				var message string
+				if err != nil {
+					message = err.Error()
+				} else if !res.Success {
+					message = res.Message
+				} else {
+					Data.Message = "Saved"
+					Data.MessageType = "infomessage"
+					Data.Command, Data.Caption = GetReloadCommand(fileName)
+				}
+
+				if message != "" {
+					Data.Message = message
+					Data.MessageType = "errormessage"
+				}
+
+				Data.Content, message = GetNodeContent(fileName, AgentUrl, Data.NodeName)
+				if message != "" {
+					Data.Message = message
+					Data.MessageType = "errormessage"
+				}
+			}
+
+			err := mytemplate.ExecuteTemplate(w, "editnode.html", Data)
+			if err != nil {
+				WriteLog("Error in EditNode execute template: " + err.Error())
+			}
+		} else {
+			http.Redirect(w, r, "Home", http.StatusTemporaryRedirect)
+		}
+	} else {
+		http.Redirect(w, r, "login", http.StatusTemporaryRedirect)
+	}
+}
+
+type DialplanType struct {
+	HeaderType
+	Nodes []TableListType
+}
+
+func Dialplan(w http.ResponseWriter, r *http.Request) {
+	exist, User := CheckSession(r)
+	if exist {
+		pbxfile := GetPBXDir() + GetCookieValue(r, "file")
+		if FileExist(pbxfile) {
+			var Data DialplanType
+			Data.HeaderType = GetAdvancedHeader(User.Name, "Dial plans", "", r)
+			AgentUrl := GetConfigValueFrom(pbxfile, "url", "")
+			if AgentUrl != "" {
+				if string(AgentUrl[len(AgentUrl)-1]) != "/" {
+					AgentUrl += "/"
+				}
+			}
+			res, err := GetFile(AgentUrl, "extensions.conf")
+			var message string
+			if err != nil {
+				message = err.Error()
+			} else if !res.Success {
+				message = res.Message
+			}
+			if message != "" {
+				Data.Message = "Error: " + message
+				Data.MessageType = "errormessage"
+			}
+
+			nodes := GetNodes(res.Content)
+			for i, node := range nodes {
+				var record TableListType
+				record.Name = node
+				record.NewTR = (i+1)%6 == 0
+				Data.Nodes = append(Data.Nodes, record)
+			}
+
+			err = mytemplate.ExecuteTemplate(w, "advDialPlans.html", Data)
+			if err != nil {
+				WriteLog("Error in DialPlans execute template: " + err.Error())
+			}
+		} else {
+			http.Redirect(w, r, "Home", http.StatusTemporaryRedirect)
+		}
+	} else {
+		http.Redirect(w, r, "login", http.StatusTemporaryRedirect)
+	}
+
+}
+
+type CommandsType struct {
+	HeaderType
+	TextCommand bool
+	Command     string
+	Result      string
+}
+
+func Commands(w http.ResponseWriter, r *http.Request) {
+	exist, User := CheckSession(r)
+	if exist {
+		pbxfile := GetPBXDir() + GetCookieValue(r, "file")
+		if FileExist(pbxfile) {
+			var Data CommandsType
+			AgentUrl := GetConfigValueFrom(pbxfile, "url", "")
+			if AgentUrl != "" {
+				if string(AgentUrl[len(AgentUrl)-1]) != "/" {
+					AgentUrl += "/"
+				}
+			}
+			command := r.FormValue("command")
+			Data.Command = r.FormValue("commandtext")
+			var commandLine string
+			var selected string
+			switch command {
+			case "corereload":
+				commandLine = "core reload"
+				selected = "core reload"
+			case "sipreload":
+				commandLine = "sip reload"
+				selected = "sip reload"
+			case "dialplanreload":
+				commandLine = "dialplan reload"
+				selected = "dialplan reload"
+			case "version":
+				commandLine = "core show version"
+			case "help":
+				commandLine = "core show help"
+			case "text":
+				commandLine = Data.Command
+			}
+			if selected == "" {
+				selected = command
+			}
+			if selected != "text" {
+				Data.Command = selected
+			}
+			Data.HeaderType = GetAdvancedHeader(User.Name, "CLI commands", selected, r)
+			if command != "" {
+				Data.TextCommand = command == "text"
+
+				var res ResponseType
+				var err error
+				if strings.Contains(commandLine, "reload") {
+					res, err = callCLI(AgentUrl, commandLine)
+				} else {
+					res, err = callAMICommand(pbxfile, commandLine)
+				}
+				if err != nil {
+					Data.Message = "Error: " + err.Error()
+					Data.MessageType = "errormessage"
+				}
+				if res.Success {
+					Data.Result = res.Message
+				}
+				if Data.Result == "" {
+					Data.Result = res.Result
+				}
+			}
+			if r.FormValue("ret") != "" {
+				http.Redirect(w, r, r.Header.Get("referer"), http.StatusTemporaryRedirect)
+			}
+			err := mytemplate.ExecuteTemplate(w, "commands.html", Data)
+			if err != nil {
+				WriteLog("Error in commands execute template: " + err.Error())
+			}
+		} else {
+			http.Redirect(w, r, "Home", http.StatusTemporaryRedirect)
+		}
+	} else {
+		http.Redirect(w, r, "login", http.StatusTemporaryRedirect)
+	}
+}
+
+type CommandType struct {
+	HeaderType
+	Command string
+	Result  string
+}
+
+func AMI(w http.ResponseWriter, r *http.Request) {
+	exist, User := CheckSession(r)
+	if exist {
+		pbxfile := GetPBXDir() + GetCookieValue(r, "file")
+		if FileExist(pbxfile) {
+			var Data CommandType
+			Data.HeaderType = GetAdvancedHeader(User.Name, "AMI commands", "", r)
+			Data.Command = r.FormValue("command")
+			if r.FormValue("execute") != "" {
+				result, err := callAMI(pbxfile, Data.Command)
+				if err != nil {
+					Data.Message = "Error: " + err.Error()
+					Data.MessageType = "errormessage"
+				} else {
+					if result.Success {
+						if result.Message != "" {
+							Data.Result = time.Now().String() + "\n" + result.Message
+						}
+					} else {
+						Data.Result = result.Message
+					}
+				}
+
+			}
+			err := mytemplate.ExecuteTemplate(w, "ami.html", Data)
+			if err != nil {
+				WriteLog("Error in commands execute template: " + err.Error())
+			}
+		} else {
+			http.Redirect(w, r, "Home", http.StatusTemporaryRedirect)
+		}
+	} else {
+		http.Redirect(w, r, "login", http.StatusTemporaryRedirect)
+	}
+}
+
+func Terminal(w http.ResponseWriter, r *http.Request) {
+	exist, User := CheckSession(r)
+	if exist {
+		pbxfile := GetPBXDir() + GetCookieValue(r, "file")
+		if FileExist(pbxfile) {
+			var Data CommandType
+			Data.HeaderType = GetAdvancedHeader(User.Name, "Terminal", "", r)
+			AgentUrl := GetConfigValueFrom(pbxfile, "url", "")
+			if AgentUrl != "" {
+				if string(AgentUrl[len(AgentUrl)-1]) != "/" {
+					AgentUrl += "/"
+				}
+			}
+			Data.Command = r.FormValue("command")
+			if r.FormValue("execute") != "" {
+				res, err := executeShell(Data.Command, AgentUrl)
+				if err != nil {
+					Data.Message = err.Error()
+					Data.MessageType = "errormessage"
+				} else {
+					if res.Success {
+						Data.Result = res.Result
+					} else {
+						Data.Result = res.Message
+					}
+				}
+
+			}
+			err := mytemplate.ExecuteTemplate(w, "terminal.html", Data)
+			if err != nil {
+				WriteLog("Error in Terminal execute template: " + err.Error())
+			}
+		} else {
+			http.Redirect(w, r, "Home", http.StatusTemporaryRedirect)
+		}
+	} else {
+		http.Redirect(w, r, "login", http.StatusTemporaryRedirect)
+	}
+}
+
+type LogsType struct {
+	HeaderType
+	Result string
+	File   string
+	Lines  string
+}
+
+func Logs(w http.ResponseWriter, r *http.Request) {
+	exist, User := CheckSession(r)
+	if exist {
+		pbxfile := GetPBXDir() + GetCookieValue(r, "file")
+		if FileExist(pbxfile) {
+			var Data LogsType
+			Data.HeaderType = GetAdvancedHeader(User.Name, "Logs", "", r)
+			AgentUrl := GetConfigValueFrom(pbxfile, "url", "")
+			if AgentUrl != "" {
+				if string(AgentUrl[len(AgentUrl)-1]) != "/" {
+					AgentUrl += "/"
+				}
+			}
+			linesStr := r.FormValue("size")
+			if linesStr == "" {
+				linesStr = GetCookieValue(r, "logsize")
+				if linesStr == "" {
+					linesStr = "40"
+				}
+			}
+			Data.File = r.FormValue("file")
+			Data.Lines = linesStr
+			if Data.File != "" {
+				var fileName string
+				if Data.File == "Messages" {
+					fileName = "/var/log/asterisk/messages"
+				} else if Data.File == "Full" {
+					fileName = "/var/log/asterisk/full"
+
+				}
+				co := &http.Cookie{Name: "logsize", Value: linesStr}
+				http.SetCookie(w, co)
+
+				// Call service
+				res, err := GetLogTail(AgentUrl, fileName, Data.Lines)
+				if err != nil {
+					Data.Message = "Error: " + err.Error()
+					Data.MessageType = "errormessage"
+				} else {
+					if res.Success {
+						Data.Result = res.Content
+					} else {
+						Data.Message = res.Message
+						Data.MessageType = "errormessage"
+					}
+				}
+			}
+			err := mytemplate.ExecuteTemplate(w, "logs.html", Data)
+			if err != nil {
+				WriteLog("Error in logs execute template: " + err.Error())
+			}
+		} else {
+			http.Redirect(w, r, "Home", http.StatusTemporaryRedirect)
+		}
+	} else {
+		http.Redirect(w, r, "login", http.StatusTemporaryRedirect)
+	}
+}
+
+func Config(w http.ResponseWriter, r *http.Request) {
+	exist, User := CheckSession(r)
+	if exist {
+		pbxfile := GetPBXDir() + GetCookieValue(r, "file")
+		if FileExist(pbxfile) {
+			Data := GetAdvancedHeader(User.Name, "Configuration", "", r)
+			err := mytemplate.ExecuteTemplate(w, "config.html", Data)
+			if err != nil {
+				WriteLog("Error in Config execute template: " + err.Error())
+			}
+		} else {
+			http.Redirect(w, r, "Home", http.StatusTemporaryRedirect)
+		}
+	} else {
+		http.Redirect(w, r, "login", http.StatusTemporaryRedirect)
+	}
+}
+
+func Backup(w http.ResponseWriter, r *http.Request) {
+	exist, _ := CheckSession(r)
+	if exist {
+		pbx := GetCookieValue(r, "file")
+		pbxfile := GetPBXDir() + pbx
+		if FileExist(pbxfile) {
+			AgentUrl := GetConfigValueFrom(pbxfile, "url", "")
+			if AgentUrl != "" {
+				if string(AgentUrl[len(AgentUrl)-1]) != "/" {
+					AgentUrl += "/"
+				}
+			}
+			WriteLog("Download file called from: " + r.RemoteAddr)
+			w.Header().Set("Content-Type", "application/zip")
+
+			obj := make(map[string]interface{})
+			obj["directory"] = "/etc/asterisk/"
+			obj["ext"] = ".conf"
+			obj["name"] = pbxfile
+
+			bytes, _ := json.Marshal(obj)
+			WriteLog("Downloading: " + pbx)
+			w.Header().Set("Content-Disposition", "attachment;filename="+pbx+".zip")
+
+			op, err := DownloadFile(AgentUrl+"BackupFiles", bytes, "application/zip", w)
+			if err != nil {
+				WriteLog("Error downloading file: " + err.Error())
+				return
+			}
+
+			WriteLog("Size: " + strconv.FormatInt(op.Size, 10))
+			r.ContentLength = op.Size
+
+		} else {
+			http.Redirect(w, r, "Home", http.StatusTemporaryRedirect)
+		}
+	} else {
+		http.Redirect(w, r, "login", http.StatusTemporaryRedirect)
+	}
+}
+
+type SoundFileType struct {
+	IsDir bool
+	Name  string
+}
+
+type UploadSoundType struct {
+	HeaderType
+	Dir    string
+	Parent string
+	Files  []SoundFileType
+}
+
+func UploadSound(w http.ResponseWriter, r *http.Request) {
+	exist, User := CheckSession(r)
+	if exist {
+		pbxfile := GetPBXDir() + GetCookieValue(r, "file")
+		if FileExist(pbxfile) {
+			var Data UploadSoundType
+			Data.HeaderType = GetAdvancedHeader(User.Name, "Configuration", "", r)
+			AgentUrl := GetConfigValueFrom(pbxfile, "url", "")
+			if AgentUrl != "" {
+				if string(AgentUrl[len(AgentUrl)-1]) != "/" {
+					AgentUrl += "/"
+				}
+			}
+			dir := r.FormValue("dir")
+			if dir == "" {
+				rdir := r.FormValue("rdir")
+				if rdir != "" {
+					dir = rdir
+				} else {
+					dir = "/usr/share/asterisk/sounds"
+				}
+			}
+			message := r.FormValue("message")
+
+			if message != "" {
+				var obj ReciveFileResponseType
+				err := json.Unmarshal([]byte(message), &obj)
+				if err != nil {
+					WriteLog("Error in UploadSound Unmarshal: " + err.Error())
+				}
+				filename := obj.FileName
+				amessage := obj.Message
+				if obj.Success {
+					Data.MessageType = "infomessage"
+					Data.Message = "File: " + filename + " : " + amessage
+				} else {
+					Data.MessageType = "warnmessage"
+					Data.Message = "File: " + filename + " : " + amessage
+				}
+			}
+			dir = addSlash(dir)
+			directory := r.FormValue("directory")
+			if directory != "" {
+				dir = addSlash(dir + directory)
+			}
+			if len(dir) > 2 {
+				parent := removeSlash(dir)
+				parent = parent[0:strings.LastIndex(parent, string(os.PathSeparator))]
+				if parent == "" {
+					parent = string(os.PathSeparator)
+				}
+				Data.Parent = parent
+			}
+			Data.Dir = dir
+			filesRes, err := listFiles(AgentUrl, dir)
+			if err != nil {
+				Data.Message = err.Error()
+				Data.MessageType = "errormessage"
+			} else {
+				files := filesRes.Files
+				for i := 0; i < len(files); i++ {
+					var record SoundFileType
+					record.Name = files[i]
+					record.IsDir = !(strings.Index(record.Name, ".") > 0)
+					Data.Files = append(Data.Files, record)
+				}
+			}
+			err = mytemplate.ExecuteTemplate(w, "uploadsound.html", Data)
+			if err != nil {
+				WriteLog("Error in UploadSound execute template: " + err.Error())
+			}
+		} else {
+			http.Redirect(w, r, "Home", http.StatusTemporaryRedirect)
+		}
+	} else {
+		http.Redirect(w, r, "login", http.StatusTemporaryRedirect)
+	}
+}
+
+func PlaySound(w http.ResponseWriter, r *http.Request) {
+	exist, _ := CheckSession(r)
+	if exist {
+		pbxfile := GetPBXDir() + GetCookieValue(r, "file")
+		if FileExist(pbxfile) {
+
+			AgentUrl := GetConfigValueFrom(pbxfile, "url", "")
+			if AgentUrl != "" {
+				if string(AgentUrl[len(AgentUrl)-1]) != "/" {
+					AgentUrl += "/"
+				}
+			}
+
+			contenttype := "audio/wav"
+			filename := r.FormValue("filename")
+			w.Header().Set("ContentType", contenttype)
+			obj := make(map[string]string)
+			obj["filename"] = filename
+			obj["contenttype"] = contenttype
+			bytes, _ := json.Marshal(obj)
+			lastindex := strings.LastIndex(filename, "/")
+			name := filename
+			if lastindex != -1 {
+				name = filename[lastindex+1 : len(filename)-1]
+			}
+			println(name)
+
+			w.Header().Set("Content-Disposition", "attachment;filename="+name)
+			DownloadFile(AgentUrl+"DownloadFile", bytes, contenttype, w)
+
+		} else {
+			http.Redirect(w, r, "Home", http.StatusTemporaryRedirect)
+		}
+	} else {
+		http.Redirect(w, r, "login", http.StatusTemporaryRedirect)
+	}
+}
+
+type ReciveFileResponseType struct {
+	ResponseType
+	FileName string `json:"filename"`
+}
+
+func UploadSoundFile(w http.ResponseWriter, r *http.Request) {
+	exist, _ := CheckSession(r)
+	if exist {
+		pbxfile := GetPBXDir() + GetCookieValue(r, "file")
+		if FileExist(pbxfile) {
+
+			AgentUrl := GetConfigValueFrom(pbxfile, "url", "")
+			if AgentUrl != "" {
+				if string(AgentUrl[len(AgentUrl)-1]) != "/" {
+					AgentUrl += "/"
+				}
+			}
+			dir := r.FormValue("dir")
+			uploadurl := AgentUrl + "ReceiveFile"
+			r.ParseMultipartForm(20 << 40)
+			file, handler, err := r.FormFile("file")
+			var resp []byte
+			if err != nil {
+				WriteLog("Error in UploadSoundFile form File: " + err.Error())
+			} else {
+				jsonrequest := make(map[string]any)
+				jsonrequest["filename"] = handler.Filename
+				jsonrequest["dir"] = dir
+				bytes, _ := io.ReadAll(file)
+				var content []string
+				for _, line := range strings.Split(string(bytes), "\n") {
+					content = append(content, base64.StdEncoding.EncodeToString([]byte(line+"\n")))
+				}
+				jsonrequest["content"] = content
+				data, _ := json.Marshal(jsonrequest)
+				resp, err = restCallURL(uploadurl, data)
+			}
+			rmessage := string(resp)
+			http.Redirect(w, r, "UploadSound?rdir="+dir+"&message="+rmessage, http.StatusTemporaryRedirect)
+		} else {
+			http.Redirect(w, r, "Home", http.StatusTemporaryRedirect)
+		}
+	} else {
+		http.Redirect(w, r, "login", http.StatusTemporaryRedirect)
+	}
+
+}
+
+type AMIConfigType struct {
+	HeaderType
+	// status and users
+	Ami       bool
+	Http      bool
+	Success   bool
+	Connected bool
+	Users     []AMIUserType
+	//edf
+	Spl  []string
+	User string
+}
+
+func paramStatus(request *http.Request) bool {
+	return request.FormValue("adf") == "" && request.FormValue("edf") == ""
+}
+
+func setDefault(w http.ResponseWriter, Aurl, pbxfile string, r *http.Request, uname string) (err error) {
+	var spl []string
+	var user string
+	obj := make(map[string]string)
+	obj["Username"] = uname
+	bytes, _ := json.Marshal(obj)
+	var response []byte
+	response, err = restCallURL(Aurl+"GetAMIUserInfo", bytes)
+	if err == nil {
+		var res ResponseType
+		json.Unmarshal(response, &res)
+		if res.Success {
+			spl = strings.Split(res.Result, ":")
+			user = strings.ReplaceAll(spl[0], "[", "")
+			user = strings.ReplaceAll(user, "]", "")
+			SetConfigValueTo(pbxfile, "amiuser", user)
+			SetConfigValueTo(pbxfile, "amipass", spl[1])
+			http.Redirect(w, r, "AMIConfig", http.StatusTemporaryRedirect)
+		} else {
+			err = errors.New(res.Message)
+		}
+	}
+	return
+}
+
+func doAddAMIUser(r *http.Request, w http.ResponseWriter, Aurl string) (err error) {
+	obj := make(map[string]string)
+	obj["Username"] = r.FormValue("user")
+	obj["Secret"] = r.FormValue("sec")
+	obj["Read"] = r.FormValue("read")
+	obj["Write"] = r.FormValue("write")
+	obj["Addi"] = r.FormValue("addi")
+	bytes, _ := json.Marshal(obj)
+	var response []byte
+	response, err = restCallURL(Aurl+"AddAMIUser", bytes)
+	if err == nil {
+		var res ResponseType
+		json.Unmarshal(response, &res)
+		if res.Success {
+			http.Redirect(w, r, "AMIConfig", http.StatusTemporaryRedirect)
+		} else {
+			err = errors.New("Error in Adding AMI User: " + res.Message)
+		}
+	}
+	return
+}
+
+func editAMIUserForm(Aurl, uname string) (err error, spl []string, user string) {
+	obj := make(map[string]string)
+	obj["Username"] = uname
+	data, _ := json.Marshal(obj)
+	var response []byte
+	response, err = restCallURL(Aurl+"GetAMIUserInfo", data)
+	if err == nil {
+		var res ResponseType
+		json.Unmarshal(response, &res)
+		if res.Success {
+			spl = strings.Split(res.Result, ":")
+			user = strings.ReplaceAll(spl[0], "[", "")
+			user = strings.ReplaceAll(user, "]", "")
+		} else {
+			err = errors.New(res.Message)
+		}
+	}
+	return
+}
+
+func doModAMIUser(r *http.Request, w http.ResponseWriter, Aurl string) (err error) {
+	obj := make(map[string]string)
+	obj["Username"] = r.FormValue("cuser")
+	obj["NUsername"] = r.FormValue("user")
+	obj["Secret"] = r.FormValue("sec")
+	obj["Read"] = r.FormValue("read")
+	obj["Write"] = r.FormValue("write")
+	obj["Addi"] = r.FormValue("addi")
+	req, _ := json.Marshal(obj)
+	var data []byte
+	data, err = restCallURL(Aurl+"ModifyAMIUser", req)
+	if err == nil {
+		var res ResponseType
+		json.Unmarshal(data, &res)
+		if res.Success {
+			r.Form = make(url.Values)
+			http.Redirect(w, r, "AMIConfig", http.StatusTemporaryRedirect)
+		} else {
+			err = errors.New("Error in Adding AMI User: " + res.Message)
+		}
+	}
+	return
+}
+
+func AMIConfig(w http.ResponseWriter, r *http.Request) {
+	exist, User := CheckSession(r)
+	if exist {
+		pbxfile := GetPBXDir() + GetCookieValue(r, "file")
+		if FileExist(pbxfile) {
+			var Data AMIConfigType
+			Data.HeaderType = GetAdvancedHeader(User.Name, "Configuration", "", r)
+			AgentUrl := GetConfigValueFrom(pbxfile, "url", "")
+			if AgentUrl != "" {
+				if string(AgentUrl[len(AgentUrl)-1]) != "/" {
+					AgentUrl += "/"
+				}
+			}
+			var err error
+			if r.FormValue("def") != "" {
+				err = setDefault(w, AgentUrl, pbxfile, r, r.FormValue("def"))
+				if err != nil {
+					Data.Message = "Error: " + err.Error()
+					Data.MessageType = "errormessage"
+				}
+			}
+			if paramStatus(r) {
+				Data.Users, Data.Success, err = AMIUsers(pbxfile, AgentUrl)
+				if err == nil {
+					err, Data.Ami, Data.Http = AMIStatus(AgentUrl)
+				}
+				if err != nil {
+					Data.Message = "Error: " + err.Error()
+					Data.MessageType = "errormessage"
+				}
+				Data.Connected = err == nil
+				err = mytemplate.ExecuteTemplate(w, "AMIConfig.html", Data)
+			}
+			if r.FormValue("aok") != "" {
+				err = doAddAMIUser(r, w, AgentUrl)
+				if err != nil {
+					Data.Message = "Error: " + err.Error()
+					Data.MessageType = "errormessage"
+				}
+			}
+			if r.FormValue("adf") != "" {
+				err = mytemplate.ExecuteTemplate(w, "AMIConfigAdf.html", Data)
+			}
+			if r.FormValue("mok") != "" {
+				err = doModAMIUser(r, w, AgentUrl)
+				if err != nil {
+					Data.Message = "Error: " + err.Error()
+					Data.MessageType = "errormessage"
+				}
+			}
+			if r.FormValue("edf") != "" {
+				err, Data.Spl, Data.User = editAMIUserForm(AgentUrl, r.FormValue("edf"))
+				if err != nil {
+					Data.Message = "Error: " + err.Error()
+					Data.MessageType = "errormessage"
+				}
+				err = mytemplate.ExecuteTemplate(w, "AMIConfigEdf.html", Data)
+			}
+			if err != nil {
+				WriteLog("Error in AMIConfig: " + err.Error())
+				fmt.Fprintf(w, err.Error())
+			}
+		} else {
+			http.Redirect(w, r, "Home", http.StatusTemporaryRedirect)
+		}
+	} else {
+		http.Redirect(w, r, "login", http.StatusTemporaryRedirect)
+	}
+}
+
+type AMIUserType struct {
+	User    string
+	Spl     []string
+	Default bool
+}
+
+func getDefault(user, pass, pbxfile string) (res bool) {
+	suser := GetConfigValueFrom(pbxfile, "amiuser", "")
+	spass := GetConfigValueFrom(pbxfile, "amipass", "")
+	if suser == user && spass == pass {
+		res = true
+	} else {
+		res = false
+	}
+
+	return res
+}
+
+func AMIUsers(pbxfile, Aurl string) (users []AMIUserType, success bool, err error) {
+	var bytes []byte
+	bytes, err = restCallURL(Aurl+"GetAMIUsersInfo", nil)
+	if err == nil {
+		var res ResponseType
+		err = json.Unmarshal(bytes, &res)
+		if err == nil {
+			if res.Success {
+				if res.Result != "" {
+					success = true
+					spl := strings.Split(res.Result, ";")
+					for i := 0; i+1 < len(spl); i++ {
+						spl1 := strings.Split(spl[i], ":")
+						user := strings.ReplaceAll(spl1[0], "[", "")
+						user = strings.ReplaceAll(user, "]", "")
+						users = append(users, AMIUserType{User: user, Spl: spl1, Default: getDefault(user, spl1[1], pbxfile)})
+					}
+				}
+			} else {
+				err = errors.New(res.Message)
+			}
+		}
+	}
+	return
+}
+
+func AMIStatus(Aurl string) (err error, ami /*amiht,*/, amihttp bool) {
+	var spl []string
+	var data []byte
+	data, err = restCallURL(Aurl+"GetAMIStatus", nil)
+	if err == nil {
+		var res ResponseType
+		json.Unmarshal(data, &res)
+		if res.Success {
+			spl = strings.Split(res.Result, ":")
+			ami = spl[0] == "ok"
+			//amiht = spl[1] == "ok"
+			amihttp = spl[2] == "ok"
+		} else {
+			err = errors.New(res.Message)
+		}
+	}
+	return
+}

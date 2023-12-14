@@ -1,0 +1,15 @@
+{{ template "header" . }}
+<br>
+<h2>Terminal</h2>
+<br/><form method=POST >
+Command <input type=text name=command size = 40 
+{{if ne .Command ""}}
+value = '{{.Command}}'
+{{end}}
+/> &emsp;
+<input type=submit name=execute value='Execute' class=btn />
+</form>
+{{ if ne .Result "" }}
+<pre>{{.Result}}</pre>
+{{end}}
+{{template "footer" . }}

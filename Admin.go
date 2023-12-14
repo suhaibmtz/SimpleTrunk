@@ -44,9 +44,17 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 		}
 		reverse := r.FormValue("reverse")
 		if reverse != "" {
-			co, _ := r.Cookie("reverse")
-			co.MaxAge = 60 * 60 * 24 * 7
-			co.Value = reverse
+			co, err := r.Cookie("reverse")
+			if err != nil {
+				co = &http.Cookie{
+					Name:   "reverse",
+					MaxAge: 60 * 60 * 24 * 7,
+					Value:  reverse,
+				}
+			} else {
+				co.MaxAge = 60 * 60 * 24 * 7
+				co.Value = reverse
+			}
 			http.SetCookie(w, co)
 		} else {
 			reverse = GetCookieValue(r, "reverse")

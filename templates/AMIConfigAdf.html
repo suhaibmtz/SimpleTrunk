@@ -1,0 +1,26 @@
+{{template "header" .}}
+<br>
+<h2>AMI Configurations</h2>
+<h4>Add New AMI User</h4>
+<form method=POST >
+<table>
+<tr><td>AMI Username </td><td><input type=text name=user size=30 required/></td></td>
+	
+<tr><td>AMI Secret</td>
+<td><input type=passwoed name=sec size=30 required/></td></tr>
+	
+<tr><td>AMI Read Permission </td>
+<td><input type=text name=read size=30 value=all required/></td></td>
+		
+<tr><td>AMI Write Permission</td>
+<td><input type=text name=write size=30 value=all required/></td></tr>
+<tr><td>AMI Aditional Configuration:</td>
+<td><textarea rows = 5 cols=40 name=addi />
+deny=0.0.0.0/0.0.0.0
+permit=127.0.0.1/255.255.255.0
+</textarea></td></tr>
+        
+<tr><td><input type=submit name=aok value=OK required/></td></tr>
+</table>
+</form>
+{{ template "footer" .}}
