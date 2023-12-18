@@ -11,7 +11,7 @@ var mytemplate *template.Template
 const Version = "0.7 13Dec"
 
 func main() {
-	mytemplate = template.Must(template.ParseGlob("templates/*.html"))
+	mytemplate = template.Must(template.ParseGlob("*templates/*.html"))
 	http.Handle("/SimpleTrunk/static/", http.StripPrefix("/SimpleTrunk/static/", http.FileServer(http.Dir("./static"))))
 	http.HandleFunc("/SimpleTrunk/", Index)
 
@@ -52,6 +52,7 @@ func main() {
 
 	//PBX
 	http.HandleFunc("/SimpleTrunk/PBX", PBX)
+	http.HandleFunc("/SimpleTrunk/Extensions", Extensions)
 
 	//Admin
 	http.HandleFunc("/SimpleTrunk/Admin", Admin)

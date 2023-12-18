@@ -43,6 +43,16 @@ type HeaderType struct {
 	MessageType string
 }
 
+func (h *HeaderType) ErrorMessage(message string) {
+	h.Message = message
+	h.MessageType = "errormessage"
+}
+
+func (h *HeaderType) InfoMessage(message string) {
+	h.Message = message
+	h.MessageType = "infomessage"
+}
+
 type LoginType struct {
 	HeaderType
 	Create     bool
