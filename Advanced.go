@@ -4,7 +4,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -100,9 +99,10 @@ type StatusType struct {
 
 func Status(w http.ResponseWriter, r *http.Request) {
 	exist, User := CheckSession(r)
-	pbx := GetPBXDir() + GetCookieValue(r, "file")
+	pbxname := GetCookieValue(r, "file")
+	pbx := GetPBXDir() + pbxname
 	if exist {
-		if FileExist(pbx) {
+		if FileExist(pbx) && pbxname != "" {
 			var Data StatusType
 			command := r.FormValue("command")
 			var commandName, commandLine string
@@ -145,7 +145,7 @@ func Status(w http.ResponseWriter, r *http.Request) {
 				WriteLog("Error in Status execute template: " + err.Error())
 			}
 		} else {
-			http.Redirect(w, r, "Home", http.StatusTemporaryRedirect)
+			http.Redirect(w, r, "Home?m=Select%20PBX", http.StatusTemporaryRedirect)
 		}
 	} else {
 		http.Redirect(w, r, "login", http.StatusTemporaryRedirect)
@@ -159,9 +159,10 @@ type FilesType struct {
 
 func Files(w http.ResponseWriter, r *http.Request) {
 	exist, User := CheckSession(r)
-	pbx := GetPBXDir() + GetCookieValue(r, "file")
+	pbxname := GetCookieValue(r, "file")
+	pbx := GetPBXDir() + pbxname
 	if exist {
-		if FileExist(pbx) {
+		if FileExist(pbx) && pbxname != "" {
 			var Data FilesType
 			fileName := r.FormValue("file")
 			NewUrl := strings.ReplaceAll(r.URL.String(), ";", "%3B")
@@ -182,7 +183,7 @@ func Files(w http.ResponseWriter, r *http.Request) {
 				WriteLog("Error in Files ExecuteTemplate: " + err.Error())
 			}
 		} else {
-			http.Redirect(w, r, "Home", http.StatusTemporaryRedirect)
+			http.Redirect(w, r, "Home?m=Select%20PBX", http.StatusTemporaryRedirect)
 		}
 	} else {
 		http.Redirect(w, r, "login", http.StatusTemporaryRedirect)
@@ -204,7 +205,7 @@ func BackupFiles(w http.ResponseWriter, r *http.Request) {
 	if exist {
 		pbx := GetCookieValue(r, "file")
 		pbxfile := GetPBXDir() + pbx
-		if FileExist(pbxfile) {
+		if FileExist(pbxfile) && pbx != "" {
 			var Data BackupFilesType
 			Data.HeaderType = GetAdvancedHeader(User.Name, "BackupFiles", "", r)
 			var obj = map[string]string{}
@@ -261,7 +262,7 @@ func BackupFiles(w http.ResponseWriter, r *http.Request) {
 				WriteLog("Error in Advanced execute template: " + err.Error())
 			}
 		} else {
-			http.Redirect(w, r, "Home", http.StatusTemporaryRedirect)
+			http.Redirect(w, r, "Home?m=Select%20PBX", http.StatusTemporaryRedirect)
 		}
 	} else {
 		http.Redirect(w, r, "login", http.StatusTemporaryRedirect)
@@ -299,7 +300,7 @@ func CompareFiles(w http.ResponseWriter, r *http.Request) {
 
 		pbx := GetCookieValue(r, "file")
 		pbxfile := GetPBXDir() + pbx
-		if FileExist(pbxfile) {
+		if FileExist(pbxfile) && pbx != "" {
 			var Data CompareFilesType
 			Data.HeaderType = GetAdvancedHeader(User.Name, "Comapre", "", r)
 			r.ParseForm()
@@ -343,7 +344,7 @@ func CompareFiles(w http.ResponseWriter, r *http.Request) {
 				WriteLog("Error in Advanced execute template: " + err.Error())
 			}
 		} else {
-			http.Redirect(w, r, "Home", http.StatusTemporaryRedirect)
+			http.Redirect(w, r, "Home?m=Select%20PBX", http.StatusTemporaryRedirect)
 		}
 	} else {
 		http.Redirect(w, r, "login", http.StatusTemporaryRedirect)
@@ -359,8 +360,9 @@ type EditFileType struct {
 func EditFile(w http.ResponseWriter, r *http.Request) {
 	exist, User := CheckSession(r)
 	if exist {
-		pbxfile := GetPBXDir() + GetCookieValue(r, "file")
-		if FileExist(pbxfile) {
+		pbx := GetCookieValue(r, "file")
+		pbxfile := GetPBXDir() + pbx
+		if FileExist(pbxfile) && pbx != "" {
 			var Data EditFileType
 			Data.HeaderType = GetAdvancedHeader(User.Name, "EditFile", "", r)
 			Data.FileName = r.FormValue("filename")
@@ -407,8 +409,9 @@ type SipNodesType struct {
 func SIPNodes(w http.ResponseWriter, r *http.Request) {
 	exist, User := CheckSession(r)
 	if exist {
-		pbxfile := GetPBXDir() + GetCookieValue(r, "file")
-		if FileExist(pbxfile) {
+		pbx := GetCookieValue(r, "file")
+		pbxfile := GetPBXDir() + pbx
+		if FileExist(pbxfile) && pbx != "" {
 			var Data SipNodesType
 			Data.HeaderType = GetAdvancedHeader(User.Name, "SIP", "", r)
 			AgentUrl := GetConfigValueFrom(pbxfile, "url", "")
@@ -442,7 +445,7 @@ func SIPNodes(w http.ResponseWriter, r *http.Request) {
 				WriteLog("Error in sipNodes execute template: " + err.Error())
 			}
 		} else {
-			http.Redirect(w, r, "Home", http.StatusTemporaryRedirect)
+			http.Redirect(w, r, "Home?m=Select%20PBX", http.StatusTemporaryRedirect)
 		}
 	} else {
 		http.Redirect(w, r, "login", http.StatusTemporaryRedirect)
@@ -467,8 +470,9 @@ func EditNode(w http.ResponseWriter, r *http.Request) {
 		if !strings.Contains(fileName, "sip.") {
 			tabName = "Dial plans"
 		}
-		pbxfile := GetPBXDir() + GetCookieValue(r, "file")
-		if FileExist(pbxfile) {
+		pbx := GetCookieValue(r, "file")
+		pbxfile := GetPBXDir() + pbx
+		if FileExist(pbxfile) && pbx != "" {
 			var Data EditNodeType
 			Data.HeaderType = GetAdvancedHeader(User.Name, tabName, "", r)
 
@@ -527,7 +531,7 @@ func EditNode(w http.ResponseWriter, r *http.Request) {
 				WriteLog("Error in EditNode execute template: " + err.Error())
 			}
 		} else {
-			http.Redirect(w, r, "Home", http.StatusTemporaryRedirect)
+			http.Redirect(w, r, "Home?m=Select%20PBX", http.StatusTemporaryRedirect)
 		}
 	} else {
 		http.Redirect(w, r, "login", http.StatusTemporaryRedirect)
@@ -542,8 +546,9 @@ type DialplanType struct {
 func Dialplan(w http.ResponseWriter, r *http.Request) {
 	exist, User := CheckSession(r)
 	if exist {
-		pbxfile := GetPBXDir() + GetCookieValue(r, "file")
-		if FileExist(pbxfile) {
+		pbx := GetCookieValue(r, "file")
+		pbxfile := GetPBXDir() + pbx
+		if FileExist(pbxfile) && pbx != "" {
 			var Data DialplanType
 			Data.HeaderType = GetAdvancedHeader(User.Name, "Dial plans", "", r)
 			AgentUrl := GetConfigValueFrom(pbxfile, "url", "")
@@ -577,7 +582,7 @@ func Dialplan(w http.ResponseWriter, r *http.Request) {
 				WriteLog("Error in DialPlans execute template: " + err.Error())
 			}
 		} else {
-			http.Redirect(w, r, "Home", http.StatusTemporaryRedirect)
+			http.Redirect(w, r, "Home?m=Select%20PBX", http.StatusTemporaryRedirect)
 		}
 	} else {
 		http.Redirect(w, r, "login", http.StatusTemporaryRedirect)
@@ -595,8 +600,9 @@ type CommandsType struct {
 func Commands(w http.ResponseWriter, r *http.Request) {
 	exist, User := CheckSession(r)
 	if exist {
-		pbxfile := GetPBXDir() + GetCookieValue(r, "file")
-		if FileExist(pbxfile) {
+		pbx := GetCookieValue(r, "file")
+		pbxfile := GetPBXDir() + pbx
+		if FileExist(pbxfile) && pbx != "" {
 			var Data CommandsType
 			AgentUrl := GetConfigValueFrom(pbxfile, "url", "")
 			if AgentUrl != "" {
@@ -661,7 +667,7 @@ func Commands(w http.ResponseWriter, r *http.Request) {
 				WriteLog("Error in commands execute template: " + err.Error())
 			}
 		} else {
-			http.Redirect(w, r, "Home", http.StatusTemporaryRedirect)
+			http.Redirect(w, r, "Home?m=Select%20PBX", http.StatusTemporaryRedirect)
 		}
 	} else {
 		http.Redirect(w, r, "login", http.StatusTemporaryRedirect)
@@ -677,8 +683,9 @@ type CommandType struct {
 func AMI(w http.ResponseWriter, r *http.Request) {
 	exist, User := CheckSession(r)
 	if exist {
-		pbxfile := GetPBXDir() + GetCookieValue(r, "file")
-		if FileExist(pbxfile) {
+		pbx := GetCookieValue(r, "file")
+		pbxfile := GetPBXDir() + pbx
+		if FileExist(pbxfile) && pbx != "" {
 			var Data CommandType
 			Data.HeaderType = GetAdvancedHeader(User.Name, "AMI commands", "", r)
 			Data.Command = r.FormValue("command")
@@ -703,7 +710,7 @@ func AMI(w http.ResponseWriter, r *http.Request) {
 				WriteLog("Error in commands execute template: " + err.Error())
 			}
 		} else {
-			http.Redirect(w, r, "Home", http.StatusTemporaryRedirect)
+			http.Redirect(w, r, "Home?m=Select%20PBX", http.StatusTemporaryRedirect)
 		}
 	} else {
 		http.Redirect(w, r, "login", http.StatusTemporaryRedirect)
@@ -713,8 +720,9 @@ func AMI(w http.ResponseWriter, r *http.Request) {
 func Terminal(w http.ResponseWriter, r *http.Request) {
 	exist, User := CheckSession(r)
 	if exist {
-		pbxfile := GetPBXDir() + GetCookieValue(r, "file")
-		if FileExist(pbxfile) {
+		pbx := GetCookieValue(r, "file")
+		pbxfile := GetPBXDir() + pbx
+		if FileExist(pbxfile) && pbx != "" {
 			var Data CommandType
 			Data.HeaderType = GetAdvancedHeader(User.Name, "Terminal", "", r)
 			AgentUrl := GetConfigValueFrom(pbxfile, "url", "")
@@ -743,7 +751,7 @@ func Terminal(w http.ResponseWriter, r *http.Request) {
 				WriteLog("Error in Terminal execute template: " + err.Error())
 			}
 		} else {
-			http.Redirect(w, r, "Home", http.StatusTemporaryRedirect)
+			http.Redirect(w, r, "Home?m=Select%20PBX", http.StatusTemporaryRedirect)
 		}
 	} else {
 		http.Redirect(w, r, "login", http.StatusTemporaryRedirect)
@@ -760,8 +768,9 @@ type LogsType struct {
 func Logs(w http.ResponseWriter, r *http.Request) {
 	exist, User := CheckSession(r)
 	if exist {
-		pbxfile := GetPBXDir() + GetCookieValue(r, "file")
-		if FileExist(pbxfile) {
+		pbx := GetCookieValue(r, "file")
+		pbxfile := GetPBXDir() + pbx
+		if FileExist(pbxfile) && pbx != "" {
 			var Data LogsType
 			Data.HeaderType = GetAdvancedHeader(User.Name, "Logs", "", r)
 			AgentUrl := GetConfigValueFrom(pbxfile, "url", "")
@@ -809,7 +818,7 @@ func Logs(w http.ResponseWriter, r *http.Request) {
 				WriteLog("Error in logs execute template: " + err.Error())
 			}
 		} else {
-			http.Redirect(w, r, "Home", http.StatusTemporaryRedirect)
+			http.Redirect(w, r, "Home?m=Select%20PBX", http.StatusTemporaryRedirect)
 		}
 	} else {
 		http.Redirect(w, r, "login", http.StatusTemporaryRedirect)
@@ -819,15 +828,16 @@ func Logs(w http.ResponseWriter, r *http.Request) {
 func Config(w http.ResponseWriter, r *http.Request) {
 	exist, User := CheckSession(r)
 	if exist {
-		pbxfile := GetPBXDir() + GetCookieValue(r, "file")
-		if FileExist(pbxfile) {
+		pbx := GetCookieValue(r, "file")
+		pbxfile := GetPBXDir() + pbx
+		if FileExist(pbxfile) && pbx != "" {
 			Data := GetAdvancedHeader(User.Name, "Configuration", "", r)
 			err := mytemplate.ExecuteTemplate(w, "config.html", Data)
 			if err != nil {
 				WriteLog("Error in Config execute template: " + err.Error())
 			}
 		} else {
-			http.Redirect(w, r, "Home", http.StatusTemporaryRedirect)
+			http.Redirect(w, r, "Home?m=Select%20PBX", http.StatusTemporaryRedirect)
 		}
 	} else {
 		http.Redirect(w, r, "login", http.StatusTemporaryRedirect)
@@ -839,7 +849,7 @@ func Backup(w http.ResponseWriter, r *http.Request) {
 	if exist {
 		pbx := GetCookieValue(r, "file")
 		pbxfile := GetPBXDir() + pbx
-		if FileExist(pbxfile) {
+		if FileExist(pbxfile) && pbx != "" {
 			AgentUrl := GetConfigValueFrom(pbxfile, "url", "")
 			if AgentUrl != "" {
 				if string(AgentUrl[len(AgentUrl)-1]) != "/" {
@@ -868,7 +878,7 @@ func Backup(w http.ResponseWriter, r *http.Request) {
 			r.ContentLength = op.Size
 
 		} else {
-			http.Redirect(w, r, "Home", http.StatusTemporaryRedirect)
+			http.Redirect(w, r, "Home?m=Select%20PBX", http.StatusTemporaryRedirect)
 		}
 	} else {
 		http.Redirect(w, r, "login", http.StatusTemporaryRedirect)
@@ -890,8 +900,9 @@ type UploadSoundType struct {
 func UploadSound(w http.ResponseWriter, r *http.Request) {
 	exist, User := CheckSession(r)
 	if exist {
-		pbxfile := GetPBXDir() + GetCookieValue(r, "file")
-		if FileExist(pbxfile) {
+		pbx := GetCookieValue(r, "file")
+		pbxfile := GetPBXDir() + pbx
+		if FileExist(pbxfile) && pbx != "" {
 			var Data UploadSoundType
 			Data.HeaderType = GetAdvancedHeader(User.Name, "Configuration", "", r)
 			AgentUrl := GetConfigValueFrom(pbxfile, "url", "")
@@ -959,7 +970,7 @@ func UploadSound(w http.ResponseWriter, r *http.Request) {
 				WriteLog("Error in UploadSound execute template: " + err.Error())
 			}
 		} else {
-			http.Redirect(w, r, "Home", http.StatusTemporaryRedirect)
+			http.Redirect(w, r, "Home?m=Select%20PBX", http.StatusTemporaryRedirect)
 		}
 	} else {
 		http.Redirect(w, r, "login", http.StatusTemporaryRedirect)
@@ -969,8 +980,9 @@ func UploadSound(w http.ResponseWriter, r *http.Request) {
 func PlaySound(w http.ResponseWriter, r *http.Request) {
 	exist, _ := CheckSession(r)
 	if exist {
-		pbxfile := GetPBXDir() + GetCookieValue(r, "file")
-		if FileExist(pbxfile) {
+		pbx := GetCookieValue(r, "file")
+		pbxfile := GetPBXDir() + pbx
+		if FileExist(pbxfile) && pbx != "" {
 
 			AgentUrl := GetConfigValueFrom(pbxfile, "url", "")
 			if AgentUrl != "" {
@@ -991,13 +1003,12 @@ func PlaySound(w http.ResponseWriter, r *http.Request) {
 			if lastindex != -1 {
 				name = filename[lastindex+1 : len(filename)-1]
 			}
-			println(name)
 
 			w.Header().Set("Content-Disposition", "attachment;filename="+name)
 			DownloadFile(AgentUrl+"DownloadFile", bytes, contenttype, w)
 
 		} else {
-			http.Redirect(w, r, "Home", http.StatusTemporaryRedirect)
+			http.Redirect(w, r, "Home?m=Select%20PBX", http.StatusTemporaryRedirect)
 		}
 	} else {
 		http.Redirect(w, r, "login", http.StatusTemporaryRedirect)
@@ -1012,8 +1023,9 @@ type ReciveFileResponseType struct {
 func UploadSoundFile(w http.ResponseWriter, r *http.Request) {
 	exist, _ := CheckSession(r)
 	if exist {
-		pbxfile := GetPBXDir() + GetCookieValue(r, "file")
-		if FileExist(pbxfile) {
+		pbx := GetCookieValue(r, "file")
+		pbxfile := GetPBXDir() + pbx
+		if FileExist(pbxfile) && pbx != "" {
 
 			AgentUrl := GetConfigValueFrom(pbxfile, "url", "")
 			if AgentUrl != "" {
@@ -1044,7 +1056,7 @@ func UploadSoundFile(w http.ResponseWriter, r *http.Request) {
 			rmessage := string(resp)
 			http.Redirect(w, r, "UploadSound?rdir="+dir+"&message="+rmessage, http.StatusTemporaryRedirect)
 		} else {
-			http.Redirect(w, r, "Home", http.StatusTemporaryRedirect)
+			http.Redirect(w, r, "Home?m=Select%20PBX", http.StatusTemporaryRedirect)
 		}
 	} else {
 		http.Redirect(w, r, "login", http.StatusTemporaryRedirect)
@@ -1065,8 +1077,12 @@ type AMIConfigType struct {
 	User string
 }
 
-func paramStatus(request *http.Request) bool {
+func AMIparamStatus(request *http.Request) bool {
 	return request.FormValue("adf") == "" && request.FormValue("edf") == ""
+}
+
+func CDRparamStatus(request *http.Request) bool {
+	return request.FormValue("cf") == "" && request.FormValue("edit") == ""
 }
 
 func setDefault(w http.ResponseWriter, Aurl, pbxfile string, r *http.Request, uname string) (err error) {
@@ -1163,8 +1179,9 @@ func doModAMIUser(r *http.Request, w http.ResponseWriter, Aurl string) (err erro
 func AMIConfig(w http.ResponseWriter, r *http.Request) {
 	exist, User := CheckSession(r)
 	if exist {
-		pbxfile := GetPBXDir() + GetCookieValue(r, "file")
-		if FileExist(pbxfile) {
+		pbx := GetCookieValue(r, "file")
+		pbxfile := GetPBXDir() + pbx
+		if FileExist(pbxfile) && pbx != "" {
 			var Data AMIConfigType
 			Data.HeaderType = GetAdvancedHeader(User.Name, "Configuration", "", r)
 			AgentUrl := GetConfigValueFrom(pbxfile, "url", "")
@@ -1181,7 +1198,7 @@ func AMIConfig(w http.ResponseWriter, r *http.Request) {
 					Data.MessageType = "errormessage"
 				}
 			}
-			if paramStatus(r) {
+			if AMIparamStatus(r) {
 				Data.Users, Data.Success, err = AMIUsers(pbxfile, AgentUrl)
 				if err == nil {
 					err, Data.Ami, Data.Http = AMIStatus(AgentUrl)
@@ -1220,10 +1237,9 @@ func AMIConfig(w http.ResponseWriter, r *http.Request) {
 			}
 			if err != nil {
 				WriteLog("Error in AMIConfig: " + err.Error())
-				fmt.Fprintf(w, err.Error())
 			}
 		} else {
-			http.Redirect(w, r, "Home", http.StatusTemporaryRedirect)
+			http.Redirect(w, r, "Home?m=Select%20PBX", http.StatusTemporaryRedirect)
 		}
 	} else {
 		http.Redirect(w, r, "login", http.StatusTemporaryRedirect)
@@ -1291,4 +1307,186 @@ func AMIStatus(Aurl string) (err error, ami /*amiht,*/, amihttp bool) {
 		}
 	}
 	return
+}
+
+type CDRConfigType struct {
+	HeaderType
+	Connected  bool
+	Success    bool
+	CDRStatus  bool
+	CDRMessage string
+	Spl        []string
+}
+
+func checkCDRStatus(Aurl string) (res ResponseType, err error) {
+	var data []byte
+	data, err = restCallURL(Aurl+"GetCDRConfStatus", nil)
+	if err == nil {
+		json.Unmarshal(data, &res)
+	}
+	return
+}
+
+func GetCDRConf(Aurl string) (err error, spl []string) {
+	var data []byte
+	data, err = restCallURL(Aurl+"GetCDRConf", nil)
+	if err == nil {
+		var res ResponseType
+		json.Unmarshal(data, &res)
+		if res.Success {
+			spl = strings.Split(res.Result, ":")
+		} else {
+			err = errors.New("Error in CDR configuration: " + res.Message)
+		}
+	}
+	return
+}
+
+func GetCDRStatus(Aurl string) (err error, success bool, message string) {
+	var res ResponseType
+	res, err = checkCDRStatus(Aurl)
+	success = res.Success
+	message = res.Message
+	return
+}
+
+func EditCDRConfigForm(Aurl string) (err error, spl []string) {
+	var data []byte
+	data, err = restCallURL(Aurl+"GetCDRConf", nil)
+	if err == nil {
+		var res ResponseType
+		json.Unmarshal(data, &res)
+		if res.Success {
+			spl = strings.Split(res.Result, ":")
+		} else {
+			err = errors.New("Error in CDR configuration: " + res.Result)
+		}
+	}
+	return
+}
+
+func CDRConfig(w http.ResponseWriter, r *http.Request) {
+	exist, User := CheckSession(r)
+	pbxname := GetCookieValue(r, "file")
+	if exist {
+		pbx := GetPBXDir() + pbxname
+		if FileExist(pbx) && pbxname != "" {
+			var Data CDRConfigType
+			Data.HeaderType = GetAdvancedHeader(User.Name, "Configuration", "", r)
+			AgentUrl := GetConfigValueFrom(pbx, "url", "")
+			if AgentUrl != "" {
+				if string(AgentUrl[len(AgentUrl)-1]) != "/" {
+					AgentUrl += "/"
+				}
+			}
+			var err error
+			var chres ResponseType
+			var checkRes []byte
+			checkRes, err = restCallURL(AgentUrl+"IsCDRConf", nil)
+			if err != nil {
+				Data.Message = err.Error()
+				Data.MessageType = "errormessage"
+			}
+			Data.Connected = err == nil
+			if CDRparamStatus(r) {
+				json.Unmarshal(checkRes, &chres)
+				chsuccess := chres.Success
+				csres, _ := checkCDRStatus(AgentUrl)
+				cssuccess := csres.Success
+				if !chsuccess && !cssuccess {
+					Data.Success = false
+				}
+				if chsuccess || cssuccess {
+					Data.Success = true
+					err, Data.Spl = GetCDRConf(AgentUrl)
+					if err == nil {
+						err, Data.CDRStatus, Data.CDRMessage = GetCDRStatus(AgentUrl)
+					}
+					if err != nil {
+						Data.Message = "Error: " + err.Error()
+						Data.MessageType = "errormessage"
+					}
+				}
+				err = mytemplate.ExecuteTemplate(w, "CDRConfig.html", Data)
+			}
+			if r.FormValue("cf") != "" {
+				if r.FormValue("cok") != "" {
+					ser := r.FormValue("ser")
+					dbuname := r.FormValue("duname")
+					dbpass := r.FormValue("dpass")
+					dname := r.FormValue("dname")
+					cdrtab := r.FormValue("cdrtab")
+					keyf := r.FormValue("key")
+					obj := make(map[string]string)
+					obj["Server"] = ser
+					obj["Duname"] = dbuname
+					obj["Dpass"] = dbpass
+					obj["Dname"] = dname
+					obj["Ctab"] = cdrtab
+					obj["Ckey"] = keyf
+					bytes, _ := json.Marshal(obj)
+					var data []byte
+					data, err = restCallURL(AgentUrl+"SetCDRConf", bytes)
+					if err == nil {
+						var res ResponseType
+						json.Unmarshal(data, &res)
+						if res.Success {
+							http.Redirect(w, r, "CDRConfig", http.StatusTemporaryRedirect)
+						} else {
+							Data.Message = "Error in CDR configuration: " + res.Message
+							Data.MessageType = "errormessage"
+						}
+					}
+				}
+				err = mytemplate.ExecuteTemplate(w, "CDRConfigCf.html", Data)
+			}
+			if r.FormValue("edit") != "" {
+				if r.FormValue("mcok") != "" {
+					ser := r.FormValue("ser")
+					dbuname := r.FormValue("duname")
+					dbpass := r.FormValue("dpass")
+					dname := r.FormValue("dname")
+					cdrtab := r.FormValue("cdrtab")
+					keyf := r.FormValue("key")
+					obj := make(map[string]string)
+					obj["Server"] = ser
+					obj["Duname"] = dbuname
+					obj["Dpass"] = dbpass
+					obj["Dname"] = dname
+					obj["Ctab"] = cdrtab
+					obj["Ckey"] = keyf
+					bytes, _ := json.Marshal(obj)
+					var data []byte
+					data, err = restCallURL(AgentUrl+"ModifyCDRConf", bytes)
+					if err == nil {
+						var res ResponseType
+						json.Unmarshal(data, &res)
+						if res.Success {
+							r.Form = make(url.Values)
+							http.Redirect(w, r, "CDRConfig", http.StatusTemporaryRedirect)
+						} else {
+							err = errors.New("Error in CDR configuration: " + res.Message)
+						}
+					}
+					if err != nil {
+						Data.Message = err.Error()
+						Data.MessageType = "errormessage"
+					}
+				}
+				err, Data.Spl = EditCDRConfigForm(AgentUrl)
+				if err != nil {
+					Data.Message = err.Error()
+					Data.MessageType = "errormessage"
+				}
+				err = mytemplate.ExecuteTemplate(w, "CDRConfigEdit.html", Data)
+			}
+			if err != nil {
+				WriteLog("Error in CDRConfig execute template: " + err.Error())
+			}
+		} else {
+			http.Redirect(w, r, "Home?m=Select%20PBX", http.StatusTemporaryRedirect)
+		}
+	} else {
+		http.Redirect(w, r, "login", http.StatusTemporaryRedirect)
+	}
 }

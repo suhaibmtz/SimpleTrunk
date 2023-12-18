@@ -1,0 +1,28 @@
+{{ template "header" . }}
+<br>
+<h2>CDR Configurations</h2>
+{{if .Connected}}
+<form method=POST >
+<table>
+<tr><td>Server  </td><td><input type=text name=ser size=30 value="{{ index .Spl 0}}" required/></td></td>
+	
+<tr><td>Database User</td>
+<td><input type=text name=duname size=30 value="{{ index .Spl 1}}" required/></td></tr>
+	
+<tr><td>Database Password</td>
+<td><input type=password name=dpass size=30 value="{{ index .Spl 2}}" required/></td></tr>
+        
+<tr><td>Database Name </td>
+<td><input type=text name=dname size=30 value="{{ index .Spl 3}}"  required/></td></td>
+		
+<tr><td>CDR Table</td>
+<td><input type=text name=cdrtab size=30 value="{{ index .Spl 4}}" required/></td></tr>
+	
+<tr><td>Key Field</td>
+<td><input type=text name=key size=30 value="{{ index .Spl 5}}" required/></td></tr>
+        
+<tr><td><input type=submit name=mcok value=OK required/></td></tr>
+</table>
+</form>
+{{end}}
+{{ template "footer" . }}

@@ -112,6 +112,11 @@ func Home(w http.ResponseWriter, r *http.Request) {
 		var Data HomeType
 		Data.HeaderType = GetHeader(User.Name, "Home", r)
 		Data.Files = GetPBXFiles()
+		message := r.FormValue("m")
+		if message != "" {
+			Data.Message = message
+			Data.MessageType = "errormessage"
+		}
 		err := mytemplate.ExecuteTemplate(w, "home.html", Data)
 		if err != nil {
 			WriteLog("Error in Home execute template: " + err.Error())
@@ -128,7 +133,7 @@ func Logout(w http.ResponseWriter, r *http.Request) {
 
 func SelectPBX(w http.ResponseWriter, r *http.Request) {
 	pbx := r.FormValue("pbx")
-	if pbx != "" {
+	if pbx != "" && pbx != "--Select PBX--" {
 		http.SetCookie(w, &http.Cookie{
 			Name:  "file",
 			Value: pbx,
