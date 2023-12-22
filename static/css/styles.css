@@ -4,6 +4,7 @@ Base styles
 
 body
 {
+	size:%100;
 	margin: 0;
 	padding: 0;
 	color: #333;
@@ -52,8 +53,8 @@ body
 
 pre
 {
-    white-space: pre-wrap;
-	white-space: break-spaces;
+/*    white-space: pre-wrap;*/
+/*	white-space: break-spaces;*/
 	margin: 0;
 	padding: 7;
 	color: #444444;
@@ -187,7 +188,7 @@ Layout styles
 
 .container
 {
-	max-width: 100%;
+	width: 100%;
 	margin: 0 auto;
 }
 

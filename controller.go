@@ -941,3 +941,68 @@ func listFiles(url, folderName string) (files ListFilesType, err error) {
 	}
 	return
 }
+
+type NodeInfoType struct {
+	NodeName  string
+	Data      []string
+	Isnumeric bool
+}
+
+func (n *NodeInfoType) AddLine(line string) {
+	n.Data = append(n.Data, line)
+}
+
+func (n *NodeInfoType) IsNumeric(str string) bool {
+	// return strings.("[+-]?\\d*(\\.\\d+)?");
+	return true
+}
+
+func (n *NodeInfoType) GetProperty(name string) (value string) {
+	name = strings.ToLower(name)
+	for _, line := range n.Data {
+		dataLine := strings.TrimSpace(line)
+		if strings.Index(strings.ToLower(dataLine), name) == 0 {
+			value = dataLine[strings.Index(dataLine, "=")+1 : len(dataLine)]
+			return value
+		}
+	}
+	return
+}
+
+func (n *NodeInfoType) IsTrunk() bool {
+	istrunk := n.GetProperty("trunk")
+	return n.Isnumeric || strings.TrimSpace(strings.ToLower(istrunk)) == "yes"
+}
+
+func (n *NodeInfoType) IsExtension() bool {
+	return !n.IsTrunk()
+}
+
+func NodeInfo(nodeName string) (node NodeInfoType) {
+	node.NodeName = strings.ReplaceAll(nodeName, "[", " ")
+	node.NodeName = strings.TrimSpace(strings.ReplaceAll(nodeName, "]", " "))
+	node.Isnumeric = !node.IsNumeric(nodeName)
+	return
+}
+
+func getNodesWithInfo(content string) (nodes []NodeInfoType) {
+	var node NodeInfoType
+	for _, line := range strings.Split(content, "\n") {
+		line = strings.TrimSpace(line)
+		if strings.Index(line, "[") == 0 && strings.Index(line, "]") > 2 {
+			line = line[1 : strings.Index(line, "]")+1]
+			if node.NodeName != "" {
+				nodes = append(nodes, node)
+			}
+			node = NodeInfo(line)
+		} else {
+			if node.NodeName != "" {
+				node.AddLine(line)
+			}
+		}
+	}
+	if node.NodeName != "" {
+		nodes = append(nodes, node)
+	}
+	return
+}
