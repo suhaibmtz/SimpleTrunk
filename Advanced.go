@@ -557,26 +557,11 @@ func Dialplan(w http.ResponseWriter, r *http.Request) {
 					AgentUrl += "/"
 				}
 			}
-			res, err := GetFile(AgentUrl, "extensions.conf")
-			var message string
+			var err error
+			Data.Nodes, err = GetDialplans(AgentUrl)
 			if err != nil {
-				message = err.Error()
-			} else if !res.Success {
-				message = res.Message
+				Data.ErrorMessage(err.Error())
 			}
-			if message != "" {
-				Data.Message = "Error: " + message
-				Data.MessageType = "errormessage"
-			}
-
-			nodes := GetNodes(res.Content)
-			for i, node := range nodes {
-				var record TableListType
-				record.Name = node
-				record.NewTR = (i+1)%6 == 0
-				Data.Nodes = append(Data.Nodes, record)
-			}
-
 			err = mytemplate.ExecuteTemplate(w, "advDialPlans.html", Data)
 			if err != nil {
 				WriteLog("Error in DialPlans execute template: " + err.Error())
@@ -697,7 +682,7 @@ func AMI(w http.ResponseWriter, r *http.Request) {
 				} else {
 					if result.Success {
 						if result.Message != "" {
-							Data.Result = time.Now().String() + "\n" + result.Message
+							Data.Result = time.Now().Format("Mon Jan 2 15:04:05 MST 2006") + "\n" + result.Message
 						}
 					} else {
 						Data.Result = result.Message

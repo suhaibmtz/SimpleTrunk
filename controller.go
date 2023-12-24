@@ -1006,3 +1006,21 @@ func getNodesWithInfo(content string) (nodes []NodeInfoType) {
 	}
 	return
 }
+
+func GetDialplans(AgentUrl string) (nodes []TableListType, err error) {
+	res, err := GetFile(AgentUrl, "extensions.conf")
+	var message string
+	if err == nil {
+		if res.Success {
+			for i, node := range GetNodes(res.Content) {
+				var record TableListType
+				record.Name = node
+				record.NewTR = (i+1)%6 == 0
+				nodes = append(nodes, record)
+			}
+		} else {
+			err = errors.New("Error: " + message)
+		}
+	}
+	return
+}

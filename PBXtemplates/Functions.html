@@ -1,0 +1,79 @@
+{{ define "displayStatus" }}
+{{ if .IsBusy }}
+<h3>Talking</h3>
+{{end}}
+<font color=green><b><label id=count></label></b></font> Members
+<table class=tform>
+<tr  bgcolor=#eeeecc><th>Queue</th><th>Agent</th><th>Caller ID</th>
+<th>Duration</th><th>Info</th>
+{{ if not .IsBusy}}
+<th>Action</th>
+{{end}}
+{{ range .Queues }}
+<tr><td><b>{{.Queue}}</b></td>
+{{ if .DisplayLine}}
+<td>{{.Member}}</td>
+<td>{{.CallInfo.CallerID}}</td>
+<td>{{.CallInfo.Time}}</td>
+<td style='font-size:12'>{{.Line}}</td>
+{{end}}
+</tr>
+{{end}}
+</table>
+{{ if eq .Count 0}}
+There is no members with status ({{.Keyword}})
+{{else}}
+<script> document.getElementById('count').innerHTML = '{{.Count}}'</script>
+{{end}}
+{{end}}
+
+{{ template "header" . }}
+<br>
+<h2>Queues</h2>
+<script type='text/javascript'>
+var timeout = setTimeout('location.reload(true);', 50000);
+</script>
+<font size=2>{{.Now}}</font>
+<table><tr bgcolor=#eeeecc>
+{{ $Selected := .Funcs.Selected}}
+{{ range .Funcs.Tabs }}
+<td
+{{ if eq .Value $Selected}}
+bgcolor='#FFFFcc'
+{{end}}
+><a href='Functions?function={{.Value}}'>{{.Name}}</a></td>
+{{end}}
+</tr></table>
+{{ if eq .Funcs.Selected "paused"}}
+<h2>Paused</h2>
+{{ template "displayStatus" .}}
+{{ else if eq .Funcs.Selected "active"}}
+<h2>Active</h2>
+{{ template "displayStatus" .}}
+{{ else if eq .Funcs.Selected "talk" }}
+<h2>Talking/Waiting</h2>
+<table><tr>
+<td>
+{{ template "displayStatus" .}}
+</td><td>
+<h3>Waiting</h3>
+<font color=green><b><label id=waitcount></label></b></font> Customers
+<table class=tform>
+<tr><th>Queue</th><th>Channel</th><th>Caller ID</th><th>Application</th><th>Info</th></tr>
+</td><tr></table>
+{{range .Waiting}}
+<tr><td><b><tr><td><b>{{if .Eq}}{{.Queue}}{{end}}</b></td>
+<td>{{.Channel}}</td>
+<td>{{.Caller.callerID}}</td>
+<td>{{.Caller.application}}</td>
+<td  style='font-size:12'>{{.Line}}</td>
+</tr>
+{{end}}
+</table>
+{{ if eq .WCount 0}}
+There is no waiting customer
+{{else}}
+<script> document.getElementById('waitcount').innerHTML = '{{.WCount}}'</script>
+{{end}}
+{{end}}
+{{ template "footer" . }}

@@ -53,6 +53,9 @@ func main() {
 	//PBX
 	http.HandleFunc("/SimpleTrunk/PBX", PBX)
 	http.HandleFunc("/SimpleTrunk/Extensions", Extensions)
+	http.HandleFunc("/SimpleTrunk/Dialplans", Dialplans)
+	http.HandleFunc("/SimpleTrunk/Functions", Functions)
+	http.HandleFunc("/SimpleTrunk/Monitor", Monitor)
 
 	//Admin
 	http.HandleFunc("/SimpleTrunk/Admin", Admin)

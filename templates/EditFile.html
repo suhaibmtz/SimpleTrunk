@@ -1,6 +1,6 @@
 {{ template "header" . }}
 <br>
-<a href="Files?file=asterisk.conf">View (Read only)</a>
+<a href="Files?file={{.FileName}}">View (Read only)</a>
 <h4>Edit file: <b>[{{.FileName}}]</b> </h4>
 <form method=POST>
 <input type=hidden name=filename value={{.FileName}} />

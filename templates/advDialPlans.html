@@ -1,10 +1,7 @@
-{{ template "header" . }}
-<br>
-<h3>Dialplans</h3>
-<a href='EditNode?filename=extensions.conf'>Add new dial-plan</a>
+{{ define "dialplans" }}
 <table class=dtable>
 <tr>
-{{range .Nodes}}
+{{range .}}
 <td>
 <a href='EditNode?filename=extensions.conf&nodename={{.Name}}'>[{{.Name}}]</a></td>
 {{ if .NewTR}}
@@ -13,4 +10,10 @@
 {{end}}
 </tr>
 </table>
+{{end}}
+{{ template "header" . }}
+<br>
+<h3>Dialplans</h3>
+<a href='EditNode?filename=extensions.conf'>Add new dial-plan</a>
+{{ template "dialplans" .Nodes }}
 {{ template "footer" . }}

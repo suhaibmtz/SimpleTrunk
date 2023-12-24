@@ -1,0 +1,26 @@
+<!--cdr-->
+{{ define "cdr" }}
+
+{{end}}
+<!--calls-->
+{{ define "calls" }}
+
+{{end}}
+<!--system-->
+{{ define "system" }}
+
+{{end}}
+
+<!--page-->
+{{ template "header" . }}
+{{ if eq .Function "cdr" }}
+{{ template "cdr" . }}
+{{ else if eq .Function "calls" }}
+{{ template "calls" . }}
+{{ else if eq .Function "system" }}
+{{ template "system" . }}
+{{end}}
+<script type="text/javascript">
+var timeout = setTimeout("location.reload(true);", 50000);
+</script>
+{{ template "footer" . }}
