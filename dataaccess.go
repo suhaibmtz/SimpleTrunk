@@ -76,12 +76,14 @@ func GetUser(what string, value string) (User UserType, err error) {
 }
 
 func GetUsers() (Users []UserType, err error) {
-	rows, err := DB.Query("select id,name,password from users;")
+	rows, err := DB.Query("select id,name,password,admin from users;")
 	defer rows.Close()
 	if err == nil {
 		for rows.Next() {
 			var record UserType
-			err = rows.Scan(&record.ID, &record.Name, &record.Password)
+			var Admin sql.NullBool
+			err = rows.Scan(&record.ID, &record.Name, &record.Password, &Admin)
+			record.Admin = Admin.Bool
 			Users = append(Users, record)
 		}
 	}

@@ -10,6 +10,7 @@ type AdminType struct {
 	NewPass  string
 	ConfPass string
 	Reverse  bool
+	Users    []UserType
 }
 
 func Admin(w http.ResponseWriter, r *http.Request) {
@@ -35,6 +36,22 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 			} else {
 				Data.ErrorMessage("Not Admin")
 			}
+		}
+		if User.Admin {
+			users := CallGetUsers()
+			sorted := false
+			for !sorted {
+				sorted = true
+				for i := 0; i < len(users)-1; i++ {
+					a := users[i]
+					b := users[i+1]
+					if !a.Admin && b.Admin {
+						sorted = false
+						users[i], users[i+1] = b, a
+					}
+				}
+			}
+			Data.Users = users
 		}
 		if r.FormValue("resetpassword") != "" {
 			if Data.NewPass == "" {

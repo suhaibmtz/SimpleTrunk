@@ -49,5 +49,25 @@ SIP/Dialplan orders</a>
 <td><input class="button" type=submit name="add" value=add required><td>
 </tr>
 </table></form>
+<br>
+<h3>Users</h3>
+<table class="dtable"><tbody>
+<tr>
+<th>Name</th>
+<th>Is Admin</th>
+</tr>
+{{ range .Users}}
+<tr>
+<td>{{.Name}}</td>
+<td>
+{{ if .Admin}}
+Yes
+{{else}}
+No
+{{end}}
+</td>
+</tr>
+{{end}}
+</tbody></table>
 {{end}}
 {{ template "footer" . }}
