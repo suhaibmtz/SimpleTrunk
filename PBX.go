@@ -18,8 +18,8 @@ var pbxPages = []TabType{
 	{Value: "Monitor", Name: "Monitor"},
 }
 
-func GetPBXHeader(username, page, selected string, r *http.Request) (Head HeaderType) {
-	Head = GetHeader(username, "PBX", r)
+func GetPBXHeader(User UserType, page, selected string, r *http.Request) (Head HeaderType) {
+	Head = GetHeader(User, "PBX", r)
 	Head.Tabs = append(Head.Tabs, TabsType{Tabs: pbxPages, Selected: page})
 	var Tabs TabsType
 	switch page {
@@ -41,7 +41,7 @@ func GetPBXHeader(username, page, selected string, r *http.Request) (Head Header
 func PBX(w http.ResponseWriter, r *http.Request) {
 	exist, User := CheckSession(r)
 	if exist {
-		Header := GetPBXHeader(User.Name, "PBX", "", r)
+		Header := GetPBXHeader(User, "PBX", "", r)
 		err := mytemplate.ExecuteTemplate(w, "pbxpage.html", Header)
 		if err != nil {
 			WriteLog("Error in PBX execute template: " + err.Error())
@@ -177,7 +177,7 @@ func Extensions(w http.ResponseWriter, r *http.Request) {
 			} else {
 				Data.Type = "ext"
 			}
-			Data.HeaderType = GetPBXHeader(User.Name, page, "", r)
+			Data.HeaderType = GetPBXHeader(User, page, "", r)
 			Data.FileName = r.FormValue("file")
 			if Data.FileName == "" {
 				Data.FileName = "sip.conf"
@@ -224,7 +224,7 @@ func Dialplans(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 			var Data DialplansType
-			Data.HeaderType = GetPBXHeader(User.Name, "Dialplans", "", r)
+			Data.HeaderType = GetPBXHeader(User, "Dialplans", "", r)
 			var err error
 			action := r.FormValue("action")
 			Data.DisplayAdd = action == "displayadd"
@@ -550,7 +550,7 @@ func Functions(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 			var Data FunctionsType
-			Data.HeaderType = GetPBXHeader(User.Name, "Queues", "", r)
+			Data.HeaderType = GetPBXHeader(User, "Queues", "", r)
 			var err error
 			function := r.FormValue("function")
 			if function == "" {
@@ -817,7 +817,7 @@ func Monitor(w http.ResponseWriter, r *http.Request) {
 			case "system":
 				Data.SystemStatusType, err = GetSystemStatus(AgentUrl)
 			}
-			Data.HeaderType = GetPBXHeader(User.Name, "Monitor", selected, r)
+			Data.HeaderType = GetPBXHeader(User, "Monitor", selected, r)
 			if err != nil {
 				Data.ErrorMessage(err.Error())
 			}

@@ -16,6 +16,7 @@ type UserType struct {
 	ID       int
 	Name     string
 	Password string
+	Admin    bool
 }
 
 func GetPBXFiles() (Files []PBXFileType) {
@@ -65,9 +66,10 @@ func CheckSession(r *http.Request) (exist bool, User UserType) {
 	return
 }
 
-func GetHeader(username string, Tab string, r *http.Request) HeaderType {
+func GetHeader(User UserType, Tab string, r *http.Request) HeaderType {
 	var Header HeaderType
-	Header.LogoutText = username
+	Header.LogoutText = User.Name
+	Header.IsAdmin = User.Admin
 	PBX, err := r.Cookie("file")
 	if err == nil {
 		Header.SelectedPBX = GetPBXFile(PBX.Value)
@@ -140,7 +142,7 @@ func CallGetUsers() (Users []UserType) {
 	return
 }
 
-func AddUser(name, password string) (User UserType, success bool, message string) {
+func AddUser(name, password string, admin bool) (User UserType, success bool, message string) {
 	success = false
 	CheckFolder()
 	var exist bool
@@ -148,7 +150,7 @@ func AddUser(name, password string) (User UserType, success bool, message string
 		if password != "" {
 			User, exist = GetUserByName(name)
 			if !exist {
-				err := InsertUser(name, GetMD5(password))
+				err := InsertUser(name, GetMD5(password), admin)
 				if err != nil {
 					message = "Error: " + err.Error()
 					WriteLog("Error in AddUser: " + err.Error())
@@ -178,12 +180,14 @@ func AddTable(name, table string) {
 var UsersTable = `(
 	id INTEGER PRIMARY KEY AUTOINCREMENT,
 	name CHAR(25),
-	password CHAR(30)
+	password CHAR(30),
+	admin bool
 	)`
 
 var SessionTable = `(
 	key CHAR(30),
-	id int
+	id int,
+	time DATETIME DEFAULT CURRENT_TIMESTAMP
 	)`
 
 func CheckFolder() {

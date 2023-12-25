@@ -25,8 +25,8 @@ var AdvancedTabs = []TabType{
 	{Value: "Config", Name: "Configuration"},
 }
 
-func GetAdvancedHeader(name, page, page2 string, r *http.Request) (Data HeaderType) {
-	Data = GetHeader(name, "Advanced", r)
+func GetAdvancedHeader(User UserType, page, page2 string, r *http.Request) (Data HeaderType) {
+	Data = GetHeader(User, "Advanced", r)
 	AdvancedTabs := TabsType{Selected: page, Tabs: AdvancedTabs}
 	var Tabs TabsType
 	switch page {
@@ -81,7 +81,7 @@ func GetAdvancedHeader(name, page, page2 string, r *http.Request) (Data HeaderTy
 func Advanced(w http.ResponseWriter, r *http.Request) {
 	exist, User := CheckSession(r)
 	if exist {
-		Data := GetAdvancedHeader(User.Name, "Advanced", "", r)
+		Data := GetAdvancedHeader(User, "Advanced", "", r)
 		err := mytemplate.ExecuteTemplate(w, "advanced.html", Data)
 		if err != nil {
 			WriteLog("Error in Advanced execute template: " + err.Error())
@@ -126,7 +126,7 @@ func Status(w http.ResponseWriter, r *http.Request) {
 				commandName = strings.ToUpper(string(command[0])) + command[1:len(command)]
 			}
 			Data.Command = command
-			Data.HeaderType = GetAdvancedHeader(User.Name, "Status", commandName, r)
+			Data.HeaderType = GetAdvancedHeader(User, "Status", commandName, r)
 			if commandLine != "" {
 				Result, err := callAMICommand(pbx, commandLine)
 				if err != nil {
@@ -171,7 +171,7 @@ func Files(w http.ResponseWriter, r *http.Request) {
 				r.Form, _ = url.ParseQuery(NewUrl)
 				fileName = r.FormValue("file")
 			}
-			Data.HeaderType = GetAdvancedHeader(User.Name, "Files", fileName, r)
+			Data.HeaderType = GetAdvancedHeader(User, "Files", fileName, r)
 			var err error
 			Data.FileDataType, err = GetFileData(fileName, pbx)
 			if err != nil {
@@ -207,7 +207,7 @@ func BackupFiles(w http.ResponseWriter, r *http.Request) {
 		pbxfile := GetPBXDir() + pbx
 		if FileExist(pbxfile) && pbx != "" {
 			var Data BackupFilesType
-			Data.HeaderType = GetAdvancedHeader(User.Name, "BackupFiles", "", r)
+			Data.HeaderType = GetAdvancedHeader(User, "BackupFiles", "", r)
 			var obj = map[string]string{}
 			fileName := r.FormValue("file")
 			backupFileName := r.FormValue("backupfile")
@@ -302,7 +302,7 @@ func CompareFiles(w http.ResponseWriter, r *http.Request) {
 		pbxfile := GetPBXDir() + pbx
 		if FileExist(pbxfile) && pbx != "" {
 			var Data CompareFilesType
-			Data.HeaderType = GetAdvancedHeader(User.Name, "Comapre", "", r)
+			Data.HeaderType = GetAdvancedHeader(User, "Comapre", "", r)
 			r.ParseForm()
 			originalFileName := r.FormValue("originalfilename")
 			backupFileName := r.FormValue("backupfilename")
@@ -364,7 +364,7 @@ func EditFile(w http.ResponseWriter, r *http.Request) {
 		pbxfile := GetPBXDir() + pbx
 		if FileExist(pbxfile) && pbx != "" {
 			var Data EditFileType
-			Data.HeaderType = GetAdvancedHeader(User.Name, "EditFile", "", r)
+			Data.HeaderType = GetAdvancedHeader(User, "EditFile", "", r)
 			Data.FileName = r.FormValue("filename")
 			AgentUrl := GetConfigValueFrom(pbxfile, "url", "")
 			Response, err := GetFile(AgentUrl, Data.FileName)
@@ -413,7 +413,7 @@ func SIPNodes(w http.ResponseWriter, r *http.Request) {
 		pbxfile := GetPBXDir() + pbx
 		if FileExist(pbxfile) && pbx != "" {
 			var Data SipNodesType
-			Data.HeaderType = GetAdvancedHeader(User.Name, "SIP", "", r)
+			Data.HeaderType = GetAdvancedHeader(User, "SIP", "", r)
 			AgentUrl := GetConfigValueFrom(pbxfile, "url", "")
 			if AgentUrl != "" {
 				if string(AgentUrl[len(AgentUrl)-1]) != "/" {
@@ -474,7 +474,7 @@ func EditNode(w http.ResponseWriter, r *http.Request) {
 		pbxfile := GetPBXDir() + pbx
 		if FileExist(pbxfile) && pbx != "" {
 			var Data EditNodeType
-			Data.HeaderType = GetAdvancedHeader(User.Name, tabName, "", r)
+			Data.HeaderType = GetAdvancedHeader(User, tabName, "", r)
 
 			Data.FileName = fileName
 			AgentUrl := GetConfigValueFrom(pbxfile, "url", "")
@@ -550,7 +550,7 @@ func Dialplan(w http.ResponseWriter, r *http.Request) {
 		pbxfile := GetPBXDir() + pbx
 		if FileExist(pbxfile) && pbx != "" {
 			var Data DialplanType
-			Data.HeaderType = GetAdvancedHeader(User.Name, "Dial plans", "", r)
+			Data.HeaderType = GetAdvancedHeader(User, "Dial plans", "", r)
 			AgentUrl := GetConfigValueFrom(pbxfile, "url", "")
 			if AgentUrl != "" {
 				if string(AgentUrl[len(AgentUrl)-1]) != "/" {
@@ -622,7 +622,7 @@ func Commands(w http.ResponseWriter, r *http.Request) {
 			if selected != "text" {
 				Data.Command = selected
 			}
-			Data.HeaderType = GetAdvancedHeader(User.Name, "CLI commands", selected, r)
+			Data.HeaderType = GetAdvancedHeader(User, "CLI commands", selected, r)
 			if command != "" {
 				Data.TextCommand = command == "text"
 
@@ -672,7 +672,7 @@ func AMI(w http.ResponseWriter, r *http.Request) {
 		pbxfile := GetPBXDir() + pbx
 		if FileExist(pbxfile) && pbx != "" {
 			var Data CommandType
-			Data.HeaderType = GetAdvancedHeader(User.Name, "AMI commands", "", r)
+			Data.HeaderType = GetAdvancedHeader(User, "AMI commands", "", r)
 			Data.Command = r.FormValue("command")
 			if r.FormValue("execute") != "" {
 				result, err := callAMI(pbxfile, Data.Command)
@@ -709,7 +709,7 @@ func Terminal(w http.ResponseWriter, r *http.Request) {
 		pbxfile := GetPBXDir() + pbx
 		if FileExist(pbxfile) && pbx != "" {
 			var Data CommandType
-			Data.HeaderType = GetAdvancedHeader(User.Name, "Terminal", "", r)
+			Data.HeaderType = GetAdvancedHeader(User, "Terminal", "", r)
 			AgentUrl := GetConfigValueFrom(pbxfile, "url", "")
 			if AgentUrl != "" {
 				if string(AgentUrl[len(AgentUrl)-1]) != "/" {
@@ -757,7 +757,7 @@ func Logs(w http.ResponseWriter, r *http.Request) {
 		pbxfile := GetPBXDir() + pbx
 		if FileExist(pbxfile) && pbx != "" {
 			var Data LogsType
-			Data.HeaderType = GetAdvancedHeader(User.Name, "Logs", "", r)
+			Data.HeaderType = GetAdvancedHeader(User, "Logs", "", r)
 			AgentUrl := GetConfigValueFrom(pbxfile, "url", "")
 			if AgentUrl != "" {
 				if string(AgentUrl[len(AgentUrl)-1]) != "/" {
@@ -816,7 +816,7 @@ func Config(w http.ResponseWriter, r *http.Request) {
 		pbx := GetCookieValue(r, "file")
 		pbxfile := GetPBXDir() + pbx
 		if FileExist(pbxfile) && pbx != "" {
-			Data := GetAdvancedHeader(User.Name, "Configuration", "", r)
+			Data := GetAdvancedHeader(User, "Configuration", "", r)
 			err := mytemplate.ExecuteTemplate(w, "config.html", Data)
 			if err != nil {
 				WriteLog("Error in Config execute template: " + err.Error())
@@ -889,7 +889,7 @@ func UploadSound(w http.ResponseWriter, r *http.Request) {
 		pbxfile := GetPBXDir() + pbx
 		if FileExist(pbxfile) && pbx != "" {
 			var Data UploadSoundType
-			Data.HeaderType = GetAdvancedHeader(User.Name, "Configuration", "", r)
+			Data.HeaderType = GetAdvancedHeader(User, "Configuration", "", r)
 			AgentUrl := GetConfigValueFrom(pbxfile, "url", "")
 			if AgentUrl != "" {
 				if string(AgentUrl[len(AgentUrl)-1]) != "/" {
@@ -1168,7 +1168,7 @@ func AMIConfig(w http.ResponseWriter, r *http.Request) {
 		pbxfile := GetPBXDir() + pbx
 		if FileExist(pbxfile) && pbx != "" {
 			var Data AMIConfigType
-			Data.HeaderType = GetAdvancedHeader(User.Name, "Configuration", "", r)
+			Data.HeaderType = GetAdvancedHeader(User, "Configuration", "", r)
 			AgentUrl := GetConfigValueFrom(pbxfile, "url", "")
 			if AgentUrl != "" {
 				if string(AgentUrl[len(AgentUrl)-1]) != "/" {
@@ -1357,7 +1357,7 @@ func CDRConfig(w http.ResponseWriter, r *http.Request) {
 		pbx := GetPBXDir() + pbxname
 		if FileExist(pbx) && pbxname != "" {
 			var Data CDRConfigType
-			Data.HeaderType = GetAdvancedHeader(User.Name, "Configuration", "", r)
+			Data.HeaderType = GetAdvancedHeader(User, "Configuration", "", r)
 			AgentUrl := GetConfigValueFrom(pbx, "url", "")
 			if AgentUrl != "" {
 				if string(AgentUrl[len(AgentUrl)-1]) != "/" {

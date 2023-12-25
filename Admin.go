@@ -16,7 +16,7 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 	exist, User := CheckSession(r)
 	if exist {
 		var Data AdminType
-		Data.HeaderType = GetHeader(User.Name, "My Admin", r)
+		Data.HeaderType = GetHeader(User, "My Admin", r)
 		Data.OldPass = r.FormValue("oldpassword")
 		Data.NewPass = r.FormValue("newpassword")
 		Data.ConfPass = r.FormValue("confirmpassword")

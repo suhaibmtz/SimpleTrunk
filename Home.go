@@ -41,6 +41,7 @@ type HeaderType struct {
 	ShowPages   bool
 	Message     string
 	MessageType string
+	IsAdmin     bool
 }
 
 func (h *HeaderType) ErrorMessage(message string) {
@@ -63,7 +64,7 @@ type LoginType struct {
 
 func Login(w http.ResponseWriter, r *http.Request) {
 	var Data LoginType
-	Data.HeaderType = GetHeader("", "", r)
+	Data.HeaderType = GetHeader(UserType{}, "", r)
 	Data.ShowPages = false
 	Data.Create = len(CallGetUsers()) == 0
 	if r.FormValue("log") != "" {
@@ -71,7 +72,7 @@ func Login(w http.ResponseWriter, r *http.Request) {
 		Data.Password = r.FormValue("pass")
 		Data.RememberMe = r.FormValue("rememberme") != ""
 		if Data.Create {
-			_, success, message := AddUser(Data.Login, Data.Password)
+			_, success, message := AddUser(Data.Login, Data.Password, Data.Create)
 			if !success {
 				Data.Message = message
 				Data.MessageType = "errormessage"
@@ -120,7 +121,7 @@ func Home(w http.ResponseWriter, r *http.Request) {
 	exist, User := CheckSession(r)
 	if exist {
 		var Data HomeType
-		Data.HeaderType = GetHeader(User.Name, "Home", r)
+		Data.HeaderType = GetHeader(User, "Home", r)
 		Data.Files = GetPBXFiles()
 		message := r.FormValue("m")
 		if message != "" {
@@ -204,7 +205,7 @@ func AddPBX(w http.ResponseWriter, r *http.Request) {
 		var Data PBXType
 		Data.Submit = "Add"
 		Data.Page = "Add new PBX for administration"
-		Data.HeaderType = GetHeader(User.Name, "AddPBX", r)
+		Data.HeaderType = GetHeader(User, "AddPBX", r)
 		getPBXData(r, &Data)
 		if r.FormValue("add") != "" {
 			if !PBXEmpty(&Data) {
@@ -237,7 +238,7 @@ func EditPBX(w http.ResponseWriter, r *http.Request) {
 			var Data PBXType
 			Data.Submit = "Update"
 			Data.Page = "Edit PBX configuration"
-			Data.HeaderType = GetHeader(User.Name, "Home", r)
+			Data.HeaderType = GetHeader(User, "Home", r)
 			getPBXData(r, &Data)
 			if r.FormValue("add") != "" {
 				if !PBXEmpty(&Data) {
