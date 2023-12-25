@@ -1024,3 +1024,26 @@ func GetDialplans(AgentUrl string) (nodes []TableListType, err error) {
 	}
 	return
 }
+
+func GetCallInfo(pbxfile, callid string) (lines []string, err error) {
+
+	var res ResponseType
+	res, err = callAMICommand(pbxfile, "core show channel "+callid)
+
+	lines = strings.Split(res.Message, "\n")
+	return
+}
+
+func getFieldValue(key string, lines []string) string {
+
+	for _, line := range lines {
+		if strings.Contains(line, key) {
+			line = strings.ReplaceAll(line, "Output: ", "")
+			line = strings.TrimSpace(line)
+			line = line[strings.Index(line, ":")+1 : len(line)]
+			line = strings.TrimSpace(line)
+			return line
+		}
+	}
+	return ""
+}

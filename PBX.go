@@ -3,7 +3,9 @@ package main
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -340,7 +342,7 @@ func GetChannelID(pbxfile, queue, agent string) (channelIDs []string) {
 
 }
 
-func GetCallInfo(pbxfile, channel string) (callInfo CallInfoType) {
+func FuncsGetCallInfo(pbxfile, channel string) (callInfo CallInfoType) {
 
 	callInfo.CallerID = ""
 	op, _ := callAMI(pbxfile, "core show channel "+channel)
@@ -437,7 +439,7 @@ func GetStatusOf(pbxfile string, has bool, keyword string) (isBusy bool, queues 
 				channelIDs := GetChannelID(pbxfile, record.Queue, record.Member)
 				if len(channelIDs) != 0 {
 					for _, channelID := range channelIDs {
-						call := GetCallInfo(pbxfile, channelID)
+						call := FuncsGetCallInfo(pbxfile, channelID)
 						if len(call.CallerID) > len(record.CallInfo.CallerID) {
 							record.CallInfo = call
 						}
@@ -515,7 +517,7 @@ func GetWaiting(pbxfile string) (count int, queues []QueueType, err error) {
 				record.Line = line
 				record.Channel = channel
 
-				record.CallInfo = GetCallInfo(pbxfile, channel)
+				record.CallInfo = FuncsGetCallInfo(pbxfile, channel)
 				count++
 
 			}
@@ -593,7 +595,193 @@ func Functions(w http.ResponseWriter, r *http.Request) {
 
 type MonitorType struct {
 	HeaderType
-	Function string
+	Function  string
+	Now       string
+	CDRResult CDRResultType
+	Calls     ActiveChannelsType
+	SystemStatusType
+	CallsCount int
+}
+
+type CDRResultType struct {
+	Header []string   `json:"header"`
+	Data   [][]string `json:"data"`
+}
+
+type CDRResponseType struct {
+	ResponseType
+	Result CDRResultType `json:"result"`
+}
+
+func GetCDR(url string) (result CDRResultType, err error) {
+
+	data, err := restCallURL(url+"GetLastCDR", nil)
+
+	if err == nil {
+		var res CDRResponseType
+		json.Unmarshal(data, &res)
+
+		if res.Success {
+			result = res.Result
+		}
+	}
+	return
+}
+
+type CallType struct {
+	CallerID    string
+	ID          string
+	Extension   string
+	Duration    string
+	Application string
+}
+
+type ActiveChannelsType struct {
+	Count int
+	Calls []CallType
+}
+
+type UsageLineType struct {
+	IsFont bool
+	Color  string
+	Line   string
+}
+
+type SystemStatusType struct {
+	Percent   string
+	BGColor   string
+	Time      string
+	ProcCount int
+	IP        string
+	TopProc   []string
+	Memory    string
+	Lines     []UsageLineType
+}
+
+func GetSystemStatus(url string) (System SystemStatusType, err error) {
+
+	// CPU Utilization
+	var res ResponseType
+	res, err = executeShell("top -b  | head -14 ", url)
+	loadStr := res.Result
+	toplines := strings.Split(loadStr, "\n")
+	percent := "-1"
+	if len(toplines) > 2 {
+		percent = toplines[2]
+	}
+	//%Cpu(s): 31.3 us, 9.0 sy, 0.0 ni, 59.7 id, 0.0 wa, 0.0 hi, 0.0 si, 0.0 st %
+	percent = percent[0:strings.Index(percent, "id")]
+	percent = percent[strings.LastIndex(percent, ",")+1 : len(percent)]
+	percent = strings.TrimSpace(percent)
+	utilization, _ := strconv.ParseFloat(percent, 32)
+	utilization = 100 - utilization
+	result, _ := executeShell("nproc", url)
+	var bgcolor string
+	proc := strings.ReplaceAll(result.Result, "\n", "")
+	procCount, _ := strconv.Atoi(proc)
+
+	bgcolor = "#AAFFAA"
+	if utilization > 100 {
+		bgcolor = "#990000"
+	} else if utilization > 90 {
+		bgcolor = "#FF5555"
+	} else if utilization > 50 {
+		bgcolor = "#FFFFaa"
+	}
+	if utilization > 100 {
+		utilization = 100
+	} else if utilization == 0 {
+		bgcolor = "#FFFFFF"
+	}
+
+	System.BGColor = bgcolor
+	System.Percent = fmt.Sprintf("%0.1f", utilization)
+
+	result, _ = executeShell("date", url)
+	System.Time = result.Result
+	System.ProcCount = procCount
+
+	result, _ = executeShell("ip a", url)
+	ipList := strings.Split(result.Result, "\n")
+	for _, ip := range ipList {
+		if strings.Contains(ip, "inet ") && !strings.Contains(ip, "127.0.") {
+			ip = strings.TrimSpace(ip)
+			ip = ip[strings.Index(ip, " "):len(ip)]
+			ip = strings.TrimSpace(ip)
+			ip = ip[0:strings.Index(ip, " ")]
+			System.IP = ip
+			break
+		}
+	}
+	for i := 6; i < len(toplines); i++ {
+		System.TopProc = append(System.TopProc, toplines[i])
+	}
+
+	result, _ = executeShell("free -m", url)
+	System.Memory = result.Result
+
+	result, _ = executeShell("df -h", url)
+	lines := strings.Split(result.Result, "\n")
+	for _, line := range lines {
+		var record UsageLineType
+		record.Line = line
+		if strings.Contains(line, "/") && strings.Contains(line, "%") {
+			usageStr := line[strings.Index(line, " "):strings.Index(line, "%")]
+			usageStr = strings.TrimSpace(usageStr)
+			for strings.Contains(usageStr, " ") {
+				usageStr = usageStr[strings.Index(usageStr, " "):len(usageStr)]
+				usageStr = strings.TrimSpace(usageStr)
+			}
+			usage, _ := strconv.ParseFloat(usageStr, 32)
+			if usage > 80 {
+				record.Color = "brown"
+				record.IsFont = true
+			} else if usage > 60 {
+				record.Color = "#ee7766"
+				record.IsFont = true
+			}
+		}
+		System.Lines = append(System.Lines, record)
+	}
+	return
+}
+
+func GetActiveChannels(pbxfile string) (Calls ActiveChannelsType, message string, err error) {
+
+	var res ResponseType
+	res, err = callAMICommand(pbxfile, "core show channels concise")
+	text := res.Message
+	if err == nil {
+		if len(text) < 150 {
+			if strings.Contains(text, "Privilege") {
+				message = "No active channels"
+			} else {
+				message = text
+			}
+		}
+		lines := strings.Split(text, "\n")
+		count := 0
+		for _, line := range lines {
+			if strings.Contains(line, "!") {
+				callid := line[0:strings.Index(line, "!")]
+				callid = strings.ReplaceAll(callid, "Output: ", "")
+				count++
+				// Get details call info
+				info, _ := GetCallInfo(pbxfile, callid)
+				if len(info) > 30 {
+					var record CallType
+					record.CallerID = getFieldValue("Caller ID:", info)
+					record.ID = getFieldValue("UniqueID:", info)
+					record.Extension = getFieldValue("Connected Line ID:", info)
+					record.Duration = getFieldValue("Elapsed Time:", info)
+					record.Application = getFieldValue("Application:", info)
+					Calls.Calls = append(Calls.Calls, record)
+				}
+			}
+		}
+		Calls.Count = count
+	}
+	return
 }
 
 func Monitor(w http.ResponseWriter, r *http.Request) {
@@ -611,15 +799,28 @@ func Monitor(w http.ResponseWriter, r *http.Request) {
 			var Data MonitorType
 			selected := "System"
 			function := r.FormValue("function")
+			var err error
 			switch function {
 			case "calls":
 				selected = "Active Channels"
+				var message string
+				Data.Calls, message, err = GetActiveChannels(pbx)
+				if message != "" {
+					Data.InfoMessage(message)
+				}
 			case "cdr":
 				selected = "Last CDRs"
+				Data.CDRResult, err = GetCDR(AgentUrl)
+			default:
+				Data.SystemStatusType, err = GetSystemStatus(AgentUrl)
 			}
 			Data.HeaderType = GetPBXHeader(User.Name, "Monitor", selected, r)
+			if err != nil {
+				Data.ErrorMessage(err.Error())
+			}
 			Data.Function = function
-			err := mytemplate.ExecuteTemplate(w, "Monitor.html", Data)
+			Data.Now = time.Now().Format("Mon Jan 2 15:04:05 MST 2006")
+			err = mytemplate.ExecuteTemplate(w, "Monitor.html", Data)
 			if err != nil {
 				WriteLog("Error in Extensions execute template: " + err.Error())
 			}

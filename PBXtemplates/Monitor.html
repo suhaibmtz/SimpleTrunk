@@ -1,18 +1,68 @@
 <!--cdr-->
 {{ define "cdr" }}
-
+<h2>Last CDRs</h2>
+<table class=tform><tr>
+{{ range .CDRResult.Header }}
+<th>{{.}}</th>
+{{end}}
+</tr>
+{{ range .CDRResult.Data}}
+<tr>
+{{ range . }}
+<td>{{.}}</td>
+{{end}}
+</tr>
+{{end}}
+</table>
 {{end}}
 <!--calls-->
 {{ define "calls" }}
-
+<b><lable id='channels'></lablel></b> Active channels
+<table class=tform><tr ><th>ID</th><th>Caller ID</th><th>Extension</th>
+<th>Duration</th><th>Application</th></tr>
+{{ range .Calls.Calls}}
+<tr>
+<td>{{.ID}}</td>
+<td>{{.CallerID}}</td>
+<td>{{.Extension}}</td>
+<td>{{.Duration}}</td>
+<td>{{.Application}}</td>
+</tr>
+{{end}}
+</table>
+<script>document.getElementById('channels').innerHTML='{{.Calls.Count}}'</script>
 {{end}}
 <!--system-->
 {{ define "system" }}
-
+<table class=dtable><tr>
+<td>CPU Usage</td>
+<td bgcolor="{{.BGColor}}">{{.Percent}} %</td></tr>
+</table><br/>
+<h3>Server time</h3>
+<pre>{{.Time}}</pre>
+<br/>
+<h3>Processor cores count</h3>
+<pre>{{.ProcCount}}</pre>
+<br/>
+<h3>IPs</h3>
+<pre>{{.IP}}</pre><br/>
+<h3>Top Processes</h3>
+<pre>{{range .TopProc}}
+{{.}}{{end}}</pre><br/>
+<h3>Memory (In Megabytes)</h3>
+<pre>{{.Memory}}</pre>
+<br/>
+<h3>Disk usage</h3>
+<pre>{{ range .Lines}}{{if .IsFont}}<font color={{.Color}}><b>{{end}}{{.Line}}{{if .IsFont}}</b></font>{{end}}
+{{end}}</pre>
 {{end}}
 
 <!--page-->
 {{ template "header" . }}
+<a href='Monitor?function={{.Function}}' class=btn >Refresh</a>
+<font size=2>{{.Now}}</font>
+<br/><br/>
+
 {{ if eq .Function "cdr" }}
 {{ template "cdr" . }}
 {{ else if eq .Function "calls" }}
