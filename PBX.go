@@ -799,6 +799,9 @@ func Monitor(w http.ResponseWriter, r *http.Request) {
 			var Data MonitorType
 			selected := "System"
 			function := r.FormValue("function")
+			if function == "" {
+				function = "system"
+			}
 			var err error
 			switch function {
 			case "calls":
@@ -811,7 +814,7 @@ func Monitor(w http.ResponseWriter, r *http.Request) {
 			case "cdr":
 				selected = "Last CDRs"
 				Data.CDRResult, err = GetCDR(AgentUrl)
-			default:
+			case "system":
 				Data.SystemStatusType, err = GetSystemStatus(AgentUrl)
 			}
 			Data.HeaderType = GetPBXHeader(User.Name, "Monitor", selected, r)
