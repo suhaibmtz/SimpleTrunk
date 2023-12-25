@@ -20,6 +20,22 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 		Data.OldPass = r.FormValue("oldpassword")
 		Data.NewPass = r.FormValue("newpassword")
 		Data.ConfPass = r.FormValue("confirmpassword")
+		if r.FormValue("add") != "" {
+			if User.Admin {
+				Username := r.FormValue("user")
+				Password := r.FormValue("password")
+				IsAdmin := r.FormValue("admin") != ""
+				_, success, message := AddUser(Username, Password, IsAdmin)
+				if success == false {
+					Data.ErrorMessage(message)
+				} else {
+					WriteLog(User.Name + " added " + Username)
+					Data.InfoMessage("User " + Username + " added")
+				}
+			} else {
+				Data.ErrorMessage("Not Admin")
+			}
+		}
 		if r.FormValue("resetpassword") != "" {
 			if Data.NewPass == "" {
 				Data.Message = "Empty password"

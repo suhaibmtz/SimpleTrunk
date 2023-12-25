@@ -29,10 +29,12 @@ function setSubdirectory(avalue){
 {{end}}
 </table>
 </form>
+{{ if .IsAdmin}}
 <form method=POST action='UploadSoundFile' enctype='multipart/form-data'>
 <br/>Upload file
 <input type=hidden name=dir value='{{.Dir}}' />
 <input type=file name=file />
 <input type=submit name=uploadfile value='Upload' class='button'  />
+{{end}}
 </form>
 {{ template "footer" . }}

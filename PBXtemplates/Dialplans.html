@@ -38,7 +38,9 @@ Preview only (Don't create extension)<br/>
 <br/><input type=submit name=addcontext value='Add Context'  class='button'  />
 </form>
 {{else}}
+{{if .IsAdmin}}
 <a href='Dialplans?action=displayadd' class='linkbutton'>Add new dialplan wizard</a>
+{{end}}
 {{end}}
 {{ if ne .Pre "" }}
 <br/><pre>

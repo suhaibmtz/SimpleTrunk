@@ -1,8 +1,11 @@
 {{ template "header" . }}
 <br>
 <h2>SIP Nodes</h2>
+{{ if .IsAdmin}}
 <a href='EditNode?filename=sip.conf' class='linkbutton'>
+
 Add new SIP node</a>
+{{end}}
 <table class=dtable><tr><th>Node</th><th></th></tr>
 {{ range .Nodes}}
 <tr>

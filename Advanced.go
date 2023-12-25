@@ -13,21 +13,30 @@ import (
 	"time"
 )
 
-var AdvancedTabs = []TabType{
+var AdvancedTabs1 = []TabType{
 	{Value: "Status", Name: "Status"},
 	{Value: "Files", Name: "Files"},
 	{Value: "SIPNodes", Name: "SIP"},
 	{Value: "Dialplan", Name: "Dial plans"},
+}
+var AdvancedTabsAdmin = []TabType{
 	{Value: "Commands", Name: "CLI commands"},
 	{Value: "AMI", Name: "AMI commands"},
 	{Value: "Terminal", Name: "Terminal"},
+}
+var AdvancedTabs2 = []TabType{
 	{Value: "Logs", Name: "Logs"},
 	{Value: "Config", Name: "Configuration"},
 }
 
 func GetAdvancedHeader(User UserType, page, page2 string, r *http.Request) (Data HeaderType) {
 	Data = GetHeader(User, "Advanced", r)
-	AdvancedTabs := TabsType{Selected: page, Tabs: AdvancedTabs}
+	AdvTabs := AdvancedTabs1
+	if User.Admin {
+		AdvTabs = append(AdvTabs, AdvancedTabsAdmin...)
+	}
+	AdvTabs = append(AdvTabs, AdvancedTabs2...)
+	AdvancedTabs := TabsType{Selected: page, Tabs: AdvTabs}
 	var Tabs TabsType
 	switch page {
 	case "Status":
@@ -362,7 +371,7 @@ func EditFile(w http.ResponseWriter, r *http.Request) {
 	if exist {
 		pbx := GetCookieValue(r, "file")
 		pbxfile := GetPBXDir() + pbx
-		if FileExist(pbxfile) && pbx != "" {
+		if FileExist(pbxfile) && pbx != "" && User.Admin {
 			var Data EditFileType
 			Data.HeaderType = GetAdvancedHeader(User, "EditFile", "", r)
 			Data.FileName = r.FormValue("filename")
@@ -488,9 +497,16 @@ func EditNode(w http.ResponseWriter, r *http.Request) {
 			if !strings.Contains(Data.NodeName, "[") && Data.NodeName != "" {
 				Data.NodeName = "[" + Data.NodeName + "]"
 			}
+			if Data.NodeName == "" && !User.Admin {
+				page := "SIPNodes"
+				if tabName == "Dial plans" {
+					page = "Dialplan"
+				}
+				http.Redirect(w, r, page, http.StatusTemporaryRedirect)
+			}
 
 			if Data.NodeName != "" {
-				if r.FormValue("add") != "" {
+				if r.FormValue("add") != "" && User.Admin {
 					message := addNewNode(fileName, Data.NodeName, r.FormValue("content"), AgentUrl)
 					if message == "" {
 						WriteLog(User.Name + " Added: " + Data.NodeName)
@@ -501,22 +517,24 @@ func EditNode(w http.ResponseWriter, r *http.Request) {
 						Data.MessageType = "errormessage"
 					}
 				}
-				Data.Edit = r.FormValue("edit") != ""
-				res, err := SaveNode(r, fileName, Data.NodeName, AgentUrl)
+				Data.Edit = r.FormValue("edit") != "" && User.Admin
 				var message string
-				if err != nil {
-					message = err.Error()
-				} else if !res.Success {
-					message = res.Message
-				} else {
-					Data.Message = "Saved"
-					Data.MessageType = "infomessage"
-					Data.Command, Data.Caption = GetReloadCommand(fileName)
-				}
+				if Data.IsAdmin {
+					res, err := SaveNode(r, fileName, Data.NodeName, AgentUrl)
+					if err != nil {
+						message = err.Error()
+					} else if !res.Success {
+						message = res.Message
+					} else {
+						Data.Message = "Saved"
+						Data.MessageType = "infomessage"
+						Data.Command, Data.Caption = GetReloadCommand(fileName)
+					}
 
-				if message != "" {
-					Data.Message = message
-					Data.MessageType = "errormessage"
+					if message != "" {
+						Data.Message = message
+						Data.MessageType = "errormessage"
+					}
 				}
 
 				Data.Content, message = GetNodeContent(fileName, AgentUrl, Data.NodeName)
@@ -588,68 +606,72 @@ func Commands(w http.ResponseWriter, r *http.Request) {
 		pbx := GetCookieValue(r, "file")
 		pbxfile := GetPBXDir() + pbx
 		if FileExist(pbxfile) && pbx != "" {
-			var Data CommandsType
-			AgentUrl := GetConfigValueFrom(pbxfile, "url", "")
-			if AgentUrl != "" {
-				if string(AgentUrl[len(AgentUrl)-1]) != "/" {
-					AgentUrl += "/"
+			if User.Admin {
+				var Data CommandsType
+				AgentUrl := GetConfigValueFrom(pbxfile, "url", "")
+				if AgentUrl != "" {
+					if string(AgentUrl[len(AgentUrl)-1]) != "/" {
+						AgentUrl += "/"
+					}
 				}
-			}
-			command := r.FormValue("command")
-			Data.Command = r.FormValue("commandtext")
-			var commandLine string
-			var selected string
-			switch command {
-			case "corereload":
-				commandLine = "core reload"
-				selected = "core reload"
-			case "sipreload":
-				commandLine = "sip reload"
-				selected = "sip reload"
-			case "dialplanreload":
-				commandLine = "dialplan reload"
-				selected = "dialplan reload"
-			case "version":
-				commandLine = "core show version"
-			case "help":
-				commandLine = "core show help"
-			case "text":
-				commandLine = Data.Command
-			}
-			if selected == "" {
-				selected = command
-			}
-			if selected != "text" {
-				Data.Command = selected
-			}
-			Data.HeaderType = GetAdvancedHeader(User, "CLI commands", selected, r)
-			if command != "" {
-				Data.TextCommand = command == "text"
+				command := r.FormValue("command")
+				Data.Command = r.FormValue("commandtext")
+				var commandLine string
+				var selected string
+				switch command {
+				case "corereload":
+					commandLine = "core reload"
+					selected = "core reload"
+				case "sipreload":
+					commandLine = "sip reload"
+					selected = "sip reload"
+				case "dialplanreload":
+					commandLine = "dialplan reload"
+					selected = "dialplan reload"
+				case "version":
+					commandLine = "core show version"
+				case "help":
+					commandLine = "core show help"
+				case "text":
+					commandLine = Data.Command
+				}
+				if selected == "" {
+					selected = command
+				}
+				if selected != "text" {
+					Data.Command = selected
+				}
+				Data.HeaderType = GetAdvancedHeader(User, "CLI commands", selected, r)
+				if command != "" {
+					Data.TextCommand = command == "text"
 
-				var res ResponseType
-				var err error
-				if strings.Contains(commandLine, "reload") {
-					res, err = callCLI(AgentUrl, commandLine)
-				} else {
-					res, err = callAMICommand(pbxfile, commandLine)
+					var res ResponseType
+					var err error
+					if strings.Contains(commandLine, "reload") {
+						res, err = callCLI(AgentUrl, commandLine)
+					} else {
+						res, err = callAMICommand(pbxfile, commandLine)
+					}
+					if err != nil {
+						Data.Message = "Error: " + err.Error()
+						Data.MessageType = "errormessage"
+					}
+					if res.Success {
+						Data.Result = res.Message
+					}
+					if Data.Result == "" {
+						Data.Result = res.Result
+					}
 				}
+				if r.FormValue("ret") != "" {
+					http.Redirect(w, r, r.Header.Get("referer"), http.StatusTemporaryRedirect)
+				}
+				err := mytemplate.ExecuteTemplate(w, "commands.html", Data)
 				if err != nil {
-					Data.Message = "Error: " + err.Error()
-					Data.MessageType = "errormessage"
+					WriteLog("Error in commands execute template: " + err.Error())
 				}
-				if res.Success {
-					Data.Result = res.Message
-				}
-				if Data.Result == "" {
-					Data.Result = res.Result
-				}
-			}
-			if r.FormValue("ret") != "" {
-				http.Redirect(w, r, r.Header.Get("referer"), http.StatusTemporaryRedirect)
-			}
-			err := mytemplate.ExecuteTemplate(w, "commands.html", Data)
-			if err != nil {
-				WriteLog("Error in commands execute template: " + err.Error())
+			} else {
+				http.Redirect(w, r, "Advanced", http.StatusTemporaryRedirect)
 			}
 		} else {
 			http.Redirect(w, r, "Home?m=Select%20PBX", http.StatusTemporaryRedirect)
@@ -671,28 +693,32 @@ func AMI(w http.ResponseWriter, r *http.Request) {
 		pbx := GetCookieValue(r, "file")
 		pbxfile := GetPBXDir() + pbx
 		if FileExist(pbxfile) && pbx != "" {
-			var Data CommandType
-			Data.HeaderType = GetAdvancedHeader(User, "AMI commands", "", r)
-			Data.Command = r.FormValue("command")
-			if r.FormValue("execute") != "" {
-				result, err := callAMI(pbxfile, Data.Command)
-				if err != nil {
-					Data.Message = "Error: " + err.Error()
-					Data.MessageType = "errormessage"
-				} else {
-					if result.Success {
-						if result.Message != "" {
-							Data.Result = time.Now().Format("Mon Jan 2 15:04:05 MST 2006") + "\n" + result.Message
-						}
+			if User.Admin {
+				var Data CommandType
+				Data.HeaderType = GetAdvancedHeader(User, "AMI commands", "", r)
+				Data.Command = r.FormValue("command")
+				if r.FormValue("execute") != "" {
+					result, err := callAMI(pbxfile, Data.Command)
+					if err != nil {
+						Data.Message = "Error: " + err.Error()
+						Data.MessageType = "errormessage"
 					} else {
-						Data.Result = result.Message
+						if result.Success {
+							if result.Message != "" {
+								Data.Result = time.Now().Format("Mon Jan 2 15:04:05 MST 2006") + "\n" + result.Message
+							}
+						} else {
+							Data.Result = result.Message
+						}
 					}
-				}
 
-			}
-			err := mytemplate.ExecuteTemplate(w, "ami.html", Data)
-			if err != nil {
-				WriteLog("Error in commands execute template: " + err.Error())
+				}
+				err := mytemplate.ExecuteTemplate(w, "ami.html", Data)
+				if err != nil {
+					WriteLog("Error in commands execute template: " + err.Error())
+				}
+			} else {
+				http.Redirect(w, r, "Advanced", http.StatusTemporaryRedirect)
 			}
 		} else {
 			http.Redirect(w, r, "Home?m=Select%20PBX", http.StatusTemporaryRedirect)
@@ -708,32 +734,36 @@ func Terminal(w http.ResponseWriter, r *http.Request) {
 		pbx := GetCookieValue(r, "file")
 		pbxfile := GetPBXDir() + pbx
 		if FileExist(pbxfile) && pbx != "" {
-			var Data CommandType
-			Data.HeaderType = GetAdvancedHeader(User, "Terminal", "", r)
-			AgentUrl := GetConfigValueFrom(pbxfile, "url", "")
-			if AgentUrl != "" {
-				if string(AgentUrl[len(AgentUrl)-1]) != "/" {
-					AgentUrl += "/"
-				}
-			}
-			Data.Command = r.FormValue("command")
-			if r.FormValue("execute") != "" {
-				res, err := executeShell(Data.Command, AgentUrl)
-				if err != nil {
-					Data.Message = err.Error()
-					Data.MessageType = "errormessage"
-				} else {
-					if res.Success {
-						Data.Result = res.Result
-					} else {
-						Data.Result = res.Message
+			if User.Admin {
+				var Data CommandType
+				Data.HeaderType = GetAdvancedHeader(User, "Terminal", "", r)
+				AgentUrl := GetConfigValueFrom(pbxfile, "url", "")
+				if AgentUrl != "" {
+					if string(AgentUrl[len(AgentUrl)-1]) != "/" {
+						AgentUrl += "/"
 					}
 				}
+				Data.Command = r.FormValue("command")
+				if r.FormValue("execute") != "" {
+					res, err := executeShell(Data.Command, AgentUrl)
+					if err != nil {
+						Data.Message = err.Error()
+						Data.MessageType = "errormessage"
+					} else {
+						if res.Success {
+							Data.Result = res.Result
+						} else {
+							Data.Result = res.Message
+						}
+					}
 
-			}
-			err := mytemplate.ExecuteTemplate(w, "terminal.html", Data)
-			if err != nil {
-				WriteLog("Error in Terminal execute template: " + err.Error())
+				}
+				err := mytemplate.ExecuteTemplate(w, "terminal.html", Data)
+				if err != nil {
+					WriteLog("Error in Terminal execute template: " + err.Error())
+				}
+			} else {
+				http.Redirect(w, r, "Advanced", http.StatusTemporaryRedirect)
 			}
 		} else {
 			http.Redirect(w, r, "Home?m=Select%20PBX", http.StatusTemporaryRedirect)
@@ -1062,8 +1092,8 @@ type AMIConfigType struct {
 	User string
 }
 
-func AMIparamStatus(request *http.Request) bool {
-	return request.FormValue("adf") == "" && request.FormValue("edf") == ""
+func AMIparamStatus(request *http.Request, admin bool) bool {
+	return (request.FormValue("adf") == "" && request.FormValue("edf") == "") || !admin
 }
 
 func CDRparamStatus(request *http.Request) bool {
@@ -1177,13 +1207,53 @@ func AMIConfig(w http.ResponseWriter, r *http.Request) {
 			}
 			var err error
 			if r.FormValue("def") != "" {
-				err = setDefault(w, AgentUrl, pbxfile, r, r.FormValue("def"))
+				if User.Admin {
+					err = setDefault(w, AgentUrl, pbxfile, r, r.FormValue("def"))
+					if err != nil {
+						Data.Message = "Error: " + err.Error()
+						Data.MessageType = "errormessage"
+					}
+				} else {
+					http.Redirect(w, r, "AMIConfig", http.StatusTemporaryRedirect)
+				}
+			}
+			if r.FormValue("aok") != "" {
+				if User.Admin {
+					err = doAddAMIUser(r, w, AgentUrl)
+					if err != nil {
+						Data.Message = "Error: " + err.Error()
+						Data.MessageType = "errormessage"
+					}
+				}
+			}
+			if r.FormValue("adf") != "" {
+				if User.Admin {
+					err = mytemplate.ExecuteTemplate(w, "AMIConfigAdf.html", Data)
+				} else {
+					http.Redirect(w, r, "AMIConfig", http.StatusTemporaryRedirect)
+				}
+			}
+			if r.FormValue("mok") != "" && User.Admin {
+				err = doModAMIUser(r, w, AgentUrl)
 				if err != nil {
 					Data.Message = "Error: " + err.Error()
 					Data.MessageType = "errormessage"
 				}
 			}
-			if AMIparamStatus(r) {
+			if r.FormValue("edf") != "" {
+				if User.Admin {
+					err, Data.Spl, Data.User = editAMIUserForm(AgentUrl, r.FormValue("edf"))
+					if err != nil {
+						Data.Message = "Error: " + err.Error()
+						Data.MessageType = "errormessage"
+					}
+					err = mytemplate.ExecuteTemplate(w, "AMIConfigEdf.html", Data)
+				} else {
+					http.Redirect(w, r, "AMIConfig", http.StatusTemporaryRedirect)
+					return
+				}
+			}
+			if AMIparamStatus(r, User.Admin) {
 				Data.Users, Data.Success, err = AMIUsers(pbxfile, AgentUrl)
 				if err == nil {
 					err, Data.Ami, Data.Http = AMIStatus(AgentUrl)
@@ -1194,31 +1264,6 @@ func AMIConfig(w http.ResponseWriter, r *http.Request) {
 				}
 				Data.Connected = err == nil
 				err = mytemplate.ExecuteTemplate(w, "AMIConfig.html", Data)
-			}
-			if r.FormValue("aok") != "" {
-				err = doAddAMIUser(r, w, AgentUrl)
-				if err != nil {
-					Data.Message = "Error: " + err.Error()
-					Data.MessageType = "errormessage"
-				}
-			}
-			if r.FormValue("adf") != "" {
-				err = mytemplate.ExecuteTemplate(w, "AMIConfigAdf.html", Data)
-			}
-			if r.FormValue("mok") != "" {
-				err = doModAMIUser(r, w, AgentUrl)
-				if err != nil {
-					Data.Message = "Error: " + err.Error()
-					Data.MessageType = "errormessage"
-				}
-			}
-			if r.FormValue("edf") != "" {
-				err, Data.Spl, Data.User = editAMIUserForm(AgentUrl, r.FormValue("edf"))
-				if err != nil {
-					Data.Message = "Error: " + err.Error()
-					Data.MessageType = "errormessage"
-				}
-				err = mytemplate.ExecuteTemplate(w, "AMIConfigEdf.html", Data)
 			}
 			if err != nil {
 				WriteLog("Error in AMIConfig: " + err.Error())

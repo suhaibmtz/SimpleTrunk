@@ -183,15 +183,17 @@ func Extensions(w http.ResponseWriter, r *http.Request) {
 				Data.FileName = "sip.conf"
 			}
 			var err error
-			Data.Pre, err = doAddNode(r, AgentUrl, &Data)
-			if err != nil {
-				Data.ErrorMessage(err.Error())
+			if User.Admin {
+				Data.Pre, err = doAddNode(r, AgentUrl, &Data)
+				if err != nil {
+					Data.ErrorMessage(err.Error())
+				}
 			}
 			Data.Nodes, err = GetExtensions(AgentUrl, Data.FileName, r, Data.Title, Data.IsExten, page)
 			if err != nil {
 				Data.ErrorMessage(err.Error())
 			}
-			Data.DisplayAdd = r.FormValue("add") != ""
+			Data.DisplayAdd = r.FormValue("add") != "" && User.Admin
 			err = mytemplate.ExecuteTemplate(w, "Extensions.html", Data)
 			if err != nil {
 				WriteLog("Error in Extensions execute template: " + err.Error())
@@ -227,13 +229,15 @@ func Dialplans(w http.ResponseWriter, r *http.Request) {
 			Data.HeaderType = GetPBXHeader(User, "Dialplans", "", r)
 			var err error
 			action := r.FormValue("action")
-			Data.DisplayAdd = action == "displayadd"
-			var nodename string
-			Data.Pre, nodename, err = addNewContext(r, AgentUrl)
-			if err != nil {
-				Data.ErrorMessage(err.Error())
-			} else if nodename != "" {
-				Data.InfoMessage("New node " + nodename + " has been added")
+			Data.DisplayAdd = action == "displayadd" && User.Admin
+			if User.Admin {
+				var nodename string
+				Data.Pre, nodename, err = addNewContext(r, AgentUrl)
+				if err != nil {
+					Data.ErrorMessage(err.Error())
+				} else if nodename != "" {
+					Data.InfoMessage("New node " + nodename + " has been added")
+				}
 			}
 			Data.Nodes, err = GetDialplans(AgentUrl)
 			if err != nil {

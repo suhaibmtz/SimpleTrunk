@@ -22,7 +22,9 @@ Text <br/><textarea cols=100 rows=10 name=content >
 {{.Content}}
 </textarea>
 {{else}}
+{{ if .IsAdmin}}
 <input type=submit value=Edit name=edit  class='button'  />
+{{end}}
 <pre>
 {{.Content}}
 </pre>

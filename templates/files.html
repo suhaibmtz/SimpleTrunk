@@ -11,10 +11,12 @@
 </table></tr>
 {{else if ne .FileName ""}}
 <h3>{{.FileName}} <a href='BackupFiles?file={{.FileName}}'>Revisions</a></h3>
+{{ if .IsAdmin}}
 <form method=GET action=EditFile>
 <input type=hidden name=filename value='{{.FileName}}' />
 <input type=submit name=edit value= 'Edit file' class='button' />
 </form>
+{{end}}
 Last updated: <font size=-1>{{.LastUpdate}}</font><br/>
 {{ range .Include}}
 <a href='{{.Action}}{{.Line}}'>{{.Line}}</a><br/>

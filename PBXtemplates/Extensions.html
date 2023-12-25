@@ -29,11 +29,13 @@
 </pre>
 <br>
 {{end}}
-{{ if not .DisplayAdd }}
+{{ if not .DisplayAdd}}
+{{ if .IsAdmin}}
 {{ if .IsExten }}
 <a href='Extensions?file={{.FileName}}&add=1' class=linkbutton>Add new SIP Extension</a>
 {{else}}
 <a href='Extensions?file={{.FileName}}&add=2&type=trunk' class='linkbutton'>Add new SIP Trunk</a>
+{{end}}
 {{end}}
 {{else}}
 <!--display add node-->
