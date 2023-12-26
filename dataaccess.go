@@ -2,7 +2,6 @@ package main
 
 import (
 	"database/sql"
-	"fmt"
 	"io/fs"
 	"io/ioutil"
 	"os"
@@ -142,15 +141,10 @@ func Delete() {
 	for true {
 		for _, User := range toDel {
 			key := User.key
-			id := User.id
 			query := "DELETE FROM session WHERE key = '" + key + "';"
-			fmt.Println(query)
 			_, err := DB.Exec(query)
 			if err != nil {
 				WriteLog("Error in Delete old Session: " + err.Error())
-			} else {
-				User, _ := GetUserByID(id)
-				WriteLog("Deleted Old Session For " + User.Name + " with id " + fmt.Sprint(id))
 			}
 		}
 		time.Sleep(time.Minute * 5)

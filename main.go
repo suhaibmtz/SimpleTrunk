@@ -61,5 +61,8 @@ func main() {
 	http.HandleFunc("/SimpleTrunk/Admin", Admin)
 
 	println("http://localhost:10025/SimpleTrunk")
-	http.ListenAndServe(":10025", nil)
+	err := http.ListenAndServe(":10025", nil)
+	if err != nil {
+		println(err.Error())
+	}
 }

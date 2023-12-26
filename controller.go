@@ -290,7 +290,6 @@ func SavePbx(Data *PBXType, old string) (success bool) {
 	}
 
 	file := dir + Data.File
-	fmt.Println(FileExist(file), file, edit)
 	if FileExist(file) && !edit {
 		success = false
 		Data.Message = "Already Exist"
