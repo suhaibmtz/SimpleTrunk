@@ -1,0 +1,29 @@
+{{ template "header" . }}
+<br>
+<h2>CDR Configurations</h2>
+{{ if .Connected }}
+{{ if .Success}}
+<table class=dtable><tr><th>Server </th><th>Database</th>
+<th>Database Username</th><th>Database Password</th>
+<th>CDR Table</th><th>Table Key Field</th></tr>
+<tr><td>{{index .Spl 0}}</td><td>{{index .Spl 3}}</td>
+<td>{{index .Spl 1}}</td><td>{{index .Spl 2}}</td>
+<td>{{index .Spl 4}}</td><td>{{index .Spl 5}}</td></tr></table>
+{{if .IsAdmin}}
+<form style=margin-left:20px;margin-top:10px action=CDRConfig >
+<input type=submit value=Edit />
+<input type=hidden name=edit value=yes />
+</form>
+{{end}}
+{{ if .CDRStatus }}
+<p style=margin-left:20px >CDR Conf Status:<span class=infomessage> OK </span></p>
+{{else}}
+<p style=margin-left:20px >CDR Conf Status: <span class=errormessage>{{.CDRMessage}}</span></p>
+{{end}}
+{{else}}
+{{ if .IsAdmin}}
+<p class=errormessage > CDR Not Configure yet <a href="CDRConfig?cf=yes"> click to configure</a></p>
+{{end}}
+{{end}}
+{{end}}
+{{template "footer" . }}

@@ -1,13 +1,19 @@
 {{ template "header" . }}
+<br>
 <h3>Select PBX</h3>
+{{ if .IsAdmin}}
 <a href='AddPBX' class='linkbutton'>Insert new PBX</a>
+{{end}}
 <table><tr>
+{{ $IsAdmin := .IsAdmin}}
 {{ range .PBXFiles}}
 {{if .IsStc}}
 <td width=20% bgcolor={{.Color}}>
 <b><a href='SelectPBX?pbx={{.FileName}}'>{{.Title}}</a><br/>{{.IP}}</b>
 <br/>{{.FileName}}<br/>
+{{if $IsAdmin}}
 <font><a style='font-size:80%' href='EditPBX?pbx={{.FileName}}'>Edit</a></font>
+{{end}}
 </td>
 {{ if .NewTR}}
 </tr><tr>

@@ -8,6 +8,8 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
+	"regexp"
 	"strconv"
 	"strings"
 )
@@ -16,6 +18,7 @@ type UserType struct {
 	ID       int
 	Name     string
 	Password string
+	Admin    bool
 }
 
 func GetPBXFiles() (Files []PBXFileType) {
@@ -65,9 +68,10 @@ func CheckSession(r *http.Request) (exist bool, User UserType) {
 	return
 }
 
-func GetHeader(username string, Tab string, r *http.Request) HeaderType {
+func GetHeader(User UserType, Tab string, r *http.Request) HeaderType {
 	var Header HeaderType
-	Header.LogoutText = username
+	Header.LogoutText = User.Name
+	Header.IsAdmin = User.Admin
 	PBX, err := r.Cookie("file")
 	if err == nil {
 		Header.SelectedPBX = GetPBXFile(PBX.Value)
@@ -140,7 +144,7 @@ func CallGetUsers() (Users []UserType) {
 	return
 }
 
-func AddUser(name, password string) (User UserType, success bool, message string) {
+func AddUser(name, password string, admin bool) (User UserType, success bool, message string) {
 	success = false
 	CheckFolder()
 	var exist bool
@@ -148,7 +152,7 @@ func AddUser(name, password string) (User UserType, success bool, message string
 		if password != "" {
 			User, exist = GetUserByName(name)
 			if !exist {
-				err := InsertUser(name, GetMD5(password))
+				err := InsertUser(name, GetMD5(password), admin)
 				if err != nil {
 					message = "Error: " + err.Error()
 					WriteLog("Error in AddUser: " + err.Error())
@@ -178,12 +182,14 @@ func AddTable(name, table string) {
 var UsersTable = `(
 	id INTEGER PRIMARY KEY AUTOINCREMENT,
 	name CHAR(25),
-	password CHAR(30)
+	password CHAR(30),
+	admin bool
 	)`
 
 var SessionTable = `(
 	key CHAR(30),
-	id int
+	id int,
+	time DATETIME DEFAULT CURRENT_TIMESTAMP
 	)`
 
 func CheckFolder() {
@@ -272,19 +278,27 @@ func GetRemoteFile(url string) (text string, err error) {
 	return
 }
 
-func SavePbx(Data *PBXType, edit bool) (success bool) {
+func SavePbx(Data *PBXType, old string) (success bool) {
 	CheckFolder()
+	edit := old == Data.File
+	if old != Data.File {
+
+	}
 	dir := GetPBXDir()
 	if !strings.Contains(Data.File, ".") {
 		Data.File += ".stc"
 	}
 
 	file := dir + Data.File
-	if FileExist(Data.File) && !edit {
+	fmt.Println(FileExist(file), file, edit)
+	if FileExist(file) && !edit {
 		success = false
 		Data.Message = "Already Exist"
 		Data.MessageType = "errormessage"
 	} else {
+		if !edit {
+			os.Remove(dir + old)
+		}
 		Data.Url = strings.ReplaceAll(Data.Url, `\`, "")
 		success = SetConfigValueTo(file, "url", Data.Url)
 		if success {
@@ -940,4 +954,110 @@ func listFiles(url, folderName string) (files ListFilesType, err error) {
 		}
 	}
 	return
+}
+
+type NodeInfoType struct {
+	NodeName  string
+	Data      []string
+	Isnumeric bool
+}
+
+func (n *NodeInfoType) AddLine(line string) {
+	n.Data = append(n.Data, line)
+}
+
+func (n *NodeInfoType) IsNumeric(str string) bool {
+	num, _ := regexp.MatchString("[+-]?\\d*(\\.\\d+)?", str)
+	return num
+}
+
+func (n *NodeInfoType) GetProperty(name string) (value string) {
+	name = strings.ToLower(name)
+	for _, line := range n.Data {
+		dataLine := strings.TrimSpace(line)
+		if strings.Index(strings.ToLower(dataLine), name) == 0 {
+			value = dataLine[strings.Index(dataLine, "=")+1 : len(dataLine)]
+			return value
+		}
+	}
+	return
+}
+
+func (n *NodeInfoType) IsTrunk() bool {
+	istrunk := n.GetProperty("trunk")
+	return n.Isnumeric || strings.TrimSpace(strings.ToLower(istrunk)) == "yes"
+}
+
+func (n *NodeInfoType) IsExtension() bool {
+	return !n.IsTrunk()
+}
+
+func NodeInfo(nodeName string) (node NodeInfoType) {
+	node.NodeName = strings.ReplaceAll(nodeName, "[", " ")
+	node.NodeName = strings.TrimSpace(strings.ReplaceAll(nodeName, "]", " "))
+	node.Isnumeric = !node.IsNumeric(nodeName)
+	return
+}
+
+func getNodesWithInfo(content string) (nodes []NodeInfoType) {
+	var node NodeInfoType
+	for _, line := range strings.Split(content, "\n") {
+		line = strings.TrimSpace(line)
+		if strings.Index(line, "[") == 0 && strings.Index(line, "]") > 2 {
+			line = line[1 : strings.Index(line, "]")+1]
+			if node.NodeName != "" {
+				nodes = append(nodes, node)
+			}
+			node = NodeInfo(line)
+		} else {
+			if node.NodeName != "" {
+				node.AddLine(line)
+			}
+		}
+	}
+	if node.NodeName != "" {
+		nodes = append(nodes, node)
+	}
+	return
+}
+
+func GetDialplans(AgentUrl string) (nodes []TableListType, err error) {
+	res, err := GetFile(AgentUrl, "extensions.conf")
+	var message string
+	if err == nil {
+		if res.Success {
+			for i, node := range GetNodes(res.Content) {
+				var record TableListType
+				record.Name = node
+				record.NewTR = (i+1)%6 == 0
+				nodes = append(nodes, record)
+			}
+		} else {
+			err = errors.New("Error: " + message)
+		}
+	}
+	return
+}
+
+func GetCallInfo(pbxfile, callid string) (lines []string, err error) {
+
+	var res ResponseType
+	res, err = callAMICommand(pbxfile, "core show channel "+callid)
+
+	lines = strings.Split(res.Message, "\n")
+	return
+}
+
+func getFieldValue(key string, lines []string) string {
+
+	for _, line := range lines {
+		if strings.Contains(line, key) {
+			line = strings.ReplaceAll(line, "Output: ", "")
+			line = strings.TrimSpace(line)
+			line = line[strings.Index(line, ":")+1 : len(line)]
+			line = strings.TrimSpace(line)
+			return line
+		}
+	}
+	return ""
 }

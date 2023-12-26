@@ -8,10 +8,10 @@ import (
 
 var mytemplate *template.Template
 
-const Version = "0.7 13Dec"
+const Version = "1.0.0 25Dec"
 
 func main() {
-	mytemplate = template.Must(template.ParseGlob("templates/*.html"))
+	mytemplate = template.Must(template.ParseGlob("*templates/*.html"))
 	http.Handle("/SimpleTrunk/static/", http.StripPrefix("/SimpleTrunk/static/", http.FileServer(http.Dir("./static"))))
 	http.HandleFunc("/SimpleTrunk/", Index)
 
@@ -39,6 +39,7 @@ func main() {
 	http.HandleFunc("/SimpleTrunk/Config", Config)
 	http.HandleFunc("/SimpleTrunk/Backup", Backup)
 	http.HandleFunc("/SimpleTrunk/AMIConfig", AMIConfig)
+	http.HandleFunc("/SimpleTrunk/CDRConfig", CDRConfig)
 	//Advanced Files
 	http.HandleFunc("/SimpleTrunk/Files", Files)
 	http.HandleFunc("/SimpleTrunk/BackupFiles", BackupFiles)
@@ -51,6 +52,10 @@ func main() {
 
 	//PBX
 	http.HandleFunc("/SimpleTrunk/PBX", PBX)
+	http.HandleFunc("/SimpleTrunk/Extensions", Extensions)
+	http.HandleFunc("/SimpleTrunk/Dialplans", Dialplans)
+	http.HandleFunc("/SimpleTrunk/Functions", Functions)
+	http.HandleFunc("/SimpleTrunk/Monitor", Monitor)
 
 	//Admin
 	http.HandleFunc("/SimpleTrunk/Admin", Admin)

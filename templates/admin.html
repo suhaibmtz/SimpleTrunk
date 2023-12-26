@@ -27,4 +27,47 @@ reverse=no" class=btn>Unreverse
 reverse=yes" class=btn>Reverse 
 {{end}}
 SIP/Dialplan orders</a>
+<!--add user-->
+<br>
+<br>
+{{ if .IsAdmin}}
+<h3>Add user</h3>
+<form method="POST"><table>
+<tr>
+<td>UserName</td>
+<td><input type=text name="user" required></td>
+</tr>
+<tr>
+<td>Password</td>
+<td><input type=password name="password" required></td>
+</tr>
+<tr>
+<td>Is admin</td>
+<td><input type=checkbox name="admin" value="yes"></td>
+</tr>
+<tr>
+<td><input class="button" type=submit name="add" value=add required><td>
+</tr>
+</table></form>
+<br>
+<h3>Users</h3>
+<table class="dtable"><tbody>
+<tr>
+<th>Name</th>
+<th>Is Admin</th>
+</tr>
+{{ range .Users}}
+<tr>
+<td>{{.Name}}</td>
+<td>
+{{ if .Admin}}
+Yes
+{{else}}
+No
+{{end}}
+</td>
+</tr>
+{{end}}
+</tbody></table>
+{{end}}
 {{ template "footer" . }}

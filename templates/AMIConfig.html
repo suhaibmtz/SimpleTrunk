@@ -3,21 +3,27 @@
 <h2>AMI Configurations</h2>
 {{ if .Connected }}
 {{ if .Success }}
+{{ if .IsAdmin}}
 <h4>AMI Users</h4><a href='AMIConfig?adf=yes'>Add New User</a>
+{{end}}
 <table style=margin-top:10px class=dtable>
 <tr>
 <th>AMI User</th>
 <th>AMI Secret</th>
 <th>AMI Read Permission</th>
 <th>AMI Write Permission</th>
+{{ if .IsAdmin}}
 <th>Edit</th>
 <th>Default</th>
+{{end}}
 </tr>
+{{ $IsAdmin := .IsAdmin}}
 {{ range .Users }}
 <tr><td>{{.User}}</td>
 <td>{{ index .Spl 1}}</td>
 <td>{{ index .Spl 2}}</td>
 <td>{{ index .Spl 3}}</td>
+{{ if $IsAdmin}}
 <td><a href="AMIConfig?edf={{index .Spl 0}}">Edit</a></td>
 <td>
 {{ if .Default}}
@@ -25,11 +31,12 @@ Default
 {{else}}
 <a href="AMIConfig?def=[{{.User}}]">Set Default</a>
 {{end}}
+{{end}}
 </td>
 </tr>
 {{end}}
 </table><hr/>
-{{else}}
+{{else if .IsAdmin}}
 <p class="infomessage">There is no AMI User <a href="AMIConfig?adf=yes">Add AMI User</a></p>
 {{end}}
 <h4>AMI Status</h4>

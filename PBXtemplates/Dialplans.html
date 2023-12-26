@@ -1,0 +1,57 @@
+{{ define "displaySubtitle"}}
+<font color=navy><b>{{.}}</b></font>
+{{end}}
+
+{{ define "align" }}{{if .}}<br/>{{end}}&emsp;&emsp;{{end}}
+
+{{ template "header" . }}
+<br>
+<h3>Dialplans</h3>
+{{ if .DisplayAdd}}
+<table class=dtable><tr><td>
+<h4>Add new dialplan context</h4>
+<form method=POST>
+
+<input type=checkbox name=preview value=1 />
+Preview only (Don't create extension)<br/>
+{{ template "displaySubtitle" "Context name"}}
+<input type=text name=contextname size = 12 /><br/><br/>
+{{ template "displaySubtitle" "Match Digits"}}
+{{ template "align" true}}
+<input type=radio name=digits value=any checked /> Any digits<br/>
+{{ template "align" false}}
+<input type=radio name=digits value=fixed /> Fixed digits
+<input type=text name=fixedvalue size = 5 /><br/>
+{{ template "align" false}}
+<input type=radio name=digits value=pattern /> pattern
+<input type=text name=patternvalue size=5 /><br/><br/>
+{{ template "displaySubtitle" "Context plan"}}
+{{ template "align" true}}
+<input type=checkbox name=answer value=1 />Answer
+{{ template "align" true}}
+<input type=checkbox name=play value=1 />Play recording<input type=text name=recording />
+
+{{ template "align" true}}
+<input type=checkbox name=dial value=1 />Dial 
+<input type=text name=dialto value = 'SIP/${EXTEN},,120'/><br/>
+
+<br/><input type=submit name=addcontext value='Add Context'  class='button'  />
+</form>
+{{else}}
+{{if .IsAdmin}}
+<a href='Dialplans?action=displayadd' class='linkbutton'>Add new dialplan wizard</a>
+{{end}}
+{{end}}
+{{ if ne .Pre "" }}
+<br/><pre>
+{{.Pre}}
+</pre><br/>
+{{end}}
+{{if .DisplayAdd}}
+</td><td>
+{{end}}
+{{ template "dialplans" .Nodes }}
+{{if .DisplayAdd}}
+</td></tr></table>
+{{end}}
+{{ template "footer" . }}

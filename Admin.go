@@ -10,16 +10,49 @@ type AdminType struct {
 	NewPass  string
 	ConfPass string
 	Reverse  bool
+	Users    []UserType
 }
 
 func Admin(w http.ResponseWriter, r *http.Request) {
 	exist, User := CheckSession(r)
 	if exist {
 		var Data AdminType
-		Data.HeaderType = GetHeader(User.Name, "My Admin", r)
+		Data.HeaderType = GetHeader(User, "My Admin", r)
 		Data.OldPass = r.FormValue("oldpassword")
 		Data.NewPass = r.FormValue("newpassword")
 		Data.ConfPass = r.FormValue("confirmpassword")
+		if r.FormValue("add") != "" {
+			if User.Admin {
+				Username := r.FormValue("user")
+				Password := r.FormValue("password")
+				IsAdmin := r.FormValue("admin") != ""
+				_, success, message := AddUser(Username, Password, IsAdmin)
+				if success == false {
+					Data.ErrorMessage(message)
+				} else {
+					WriteLog(User.Name + " added " + Username)
+					Data.InfoMessage("User " + Username + " added")
+				}
+			} else {
+				Data.ErrorMessage("Not Admin")
+			}
+		}
+		if User.Admin {
+			users := CallGetUsers()
+			sorted := false
+			for !sorted {
+				sorted = true
+				for i := 0; i < len(users)-1; i++ {
+					a := users[i]
+					b := users[i+1]
+					if !a.Admin && b.Admin {
+						sorted = false
+						users[i], users[i+1] = b, a
+					}
+				}
+			}
+			Data.Users = users
+		}
 		if r.FormValue("resetpassword") != "" {
 			if Data.NewPass == "" {
 				Data.Message = "Empty password"
