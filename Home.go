@@ -202,25 +202,29 @@ func PBXEmpty(Data *PBXType) (empty bool) {
 func AddPBX(w http.ResponseWriter, r *http.Request) {
 	exist, User := CheckSession(r)
 	if exist {
-		var Data PBXType
-		Data.Submit = "Add"
-		Data.Page = "Add new PBX for administration"
-		Data.HeaderType = GetHeader(User, "AddPBX", r)
-		getPBXData(r, &Data)
-		if r.FormValue("add") != "" {
-			if !PBXEmpty(&Data) {
-				success := SavePbx(&Data, "")
-				if success {
-					WriteLog(User.Name + " Added: " + Data.File)
-					http.Redirect(w, r, "Home", http.StatusTemporaryRedirect)
+		if User.Admin {
+			var Data PBXType
+			Data.Submit = "Add"
+			Data.Page = "Add new PBX for administration"
+			Data.HeaderType = GetHeader(User, "AddPBX", r)
+			getPBXData(r, &Data)
+			if r.FormValue("add") != "" {
+				if !PBXEmpty(&Data) {
+					success := SavePbx(&Data, "")
+					if success {
+						WriteLog(User.Name + " Added: " + Data.File)
+						http.Redirect(w, r, "Home", http.StatusTemporaryRedirect)
+					}
 				}
+			} else {
+				getPBXDefualt(&Data)
+			}
+			err := mytemplate.ExecuteTemplate(w, "pbx.html", Data)
+			if err != nil {
+				WriteLog("Error in AddPBX ExecuteTemplate: " + err.Error())
 			}
 		} else {
-			getPBXDefualt(&Data)
-		}
-		err := mytemplate.ExecuteTemplate(w, "pbx.html", Data)
-		if err != nil {
-			WriteLog("Error in AddPBX ExecuteTemplate: " + err.Error())
+			http.Redirect(w, r, "Home", http.StatusTemporaryRedirect)
 		}
 	} else {
 		http.Redirect(w, r, "Login", http.StatusTemporaryRedirect)
@@ -230,84 +234,88 @@ func AddPBX(w http.ResponseWriter, r *http.Request) {
 func EditPBX(w http.ResponseWriter, r *http.Request) {
 	exist, User := CheckSession(r)
 	if exist {
-		pbx := r.FormValue("pbx")
-		pbxFile := GetPBXDir() + pbx
-		if !FileExist(pbxFile) || pbx == "" {
-			http.Redirect(w, r, "Home", http.StatusTemporaryRedirect)
-		} else {
-			var Data PBXType
-			Data.Submit = "Update"
-			Data.Page = "Edit PBX configuration"
-			Data.HeaderType = GetHeader(User, "Home", r)
-			getPBXData(r, &Data)
-			if r.FormValue("add") != "" {
-				if !PBXEmpty(&Data) {
-					success := SavePbx(&Data, pbx)
-					if success {
-						if Data.RemoteConfig != "" {
-							res, err := SaveRemoteFile(Data.Url, "/etc/simpletrunk/stagent.ini", Data.RemoteConfig)
-							if err != nil {
-								Data.Message = "Error: " + err.Error()
-								Data.MessageType = "errormessage"
-							} else {
-								success = res.Success
-								if !success {
-									Data.Message = "Unable to write configuration: " + res.Message
+		if User.Admin {
+			pbx := r.FormValue("pbx")
+			pbxFile := GetPBXDir() + pbx
+			if !FileExist(pbxFile) || pbx == "" {
+				http.Redirect(w, r, "Home", http.StatusTemporaryRedirect)
+			} else {
+				var Data PBXType
+				Data.Submit = "Update"
+				Data.Page = "Edit PBX configuration"
+				Data.HeaderType = GetHeader(User, "Home", r)
+				getPBXData(r, &Data)
+				if r.FormValue("add") != "" {
+					if !PBXEmpty(&Data) {
+						success := SavePbx(&Data, pbx)
+						if success {
+							if Data.RemoteConfig != "" {
+								res, err := SaveRemoteFile(Data.Url, "/etc/simpletrunk/stagent.ini", Data.RemoteConfig)
+								if err != nil {
+									Data.Message = "Error: " + err.Error()
 									Data.MessageType = "errormessage"
+								} else {
+									success = res.Success
+									if !success {
+										Data.Message = "Unable to write configuration: " + res.Message
+										Data.MessageType = "errormessage"
+									}
 								}
 							}
+							if success {
+								WriteLog(User.Name + " Edited: " + Data.File)
+								http.Redirect(w, r, "Home", http.StatusTemporaryRedirect)
+							}
 						}
-						if success {
-							WriteLog(User.Name + " Edited: " + Data.File)
+					}
+				} else if r.FormValue("remove") != "" {
+					filename := r.FormValue("filetoremove")
+					if filename != pbx || strings.ContainsAny(filename, "/") {
+						Data.Message = "Wrong File"
+						Data.MessageType = "errormessage"
+					} else {
+						err := os.Rename(pbxFile, pbxFile+".bk")
+						if err == nil {
+							WriteLog(User.Name + " Removed: " + Data.File)
 							http.Redirect(w, r, "Home", http.StatusTemporaryRedirect)
 						}
 					}
-				}
-			} else if r.FormValue("remove") != "" {
-				filename := r.FormValue("filetoremove")
-				if filename != pbx || strings.ContainsAny(filename, "/") {
-					Data.Message = "Wrong File"
-					Data.MessageType = "errormessage"
 				} else {
-					err := os.Rename(pbxFile, pbxFile+".bk")
-					if err == nil {
-						WriteLog(User.Name + " Removed: " + Data.File)
-						http.Redirect(w, r, "Home", http.StatusTemporaryRedirect)
+					Data.Count, _ = strconv.Atoi(GetConfigValueFrom(pbxFile, "index", r.FormValue("index")))
+					Data.Title = GetConfigValueFrom(pbxFile, "title", r.FormValue("title"))
+					Data.File = r.FormValue("file")
+					if Data.File == "" {
+						Data.File = pbx
 					}
+					Data.Url = GetConfigValueFrom(pbxFile, "url", r.FormValue("url"))
+					Data.AMIUser = GetConfigValueFrom(pbxFile, "amiuser", r.FormValue("amiuser"))
+					Data.AMIPass = GetConfigValueFrom(pbxFile, "amipass", r.FormValue("amipass"))
+					var err error
+					Data.RemoteConfig, err = GetRemoteFile(Data.Url)
+					if err != nil {
+						Data.Message = "Error: " + err.Error()
+						Data.MessageType = "errormessage"
+					} else if strings.TrimSpace(Data.RemoteConfig) == "" {
+						Data.RemoteConfig = "amiurl=http://localhost:8088/rawman\n" +
+							"cdrdbserver=\n" +
+							"cdrdatabase=\n" +
+							"cdruser=\n" +
+							"cdrpass=\n" +
+							"cdrtable=\n" +
+							"cdrkeyfield="
+					}
+					if Data.Count == 0 {
+						Data.Count = len(GetPBXFiles()) + 1
+					}
+					getPBXDefualt(&Data)
 				}
-			} else {
-				Data.Count, _ = strconv.Atoi(GetConfigValueFrom(pbxFile, "index", r.FormValue("index")))
-				Data.Title = GetConfigValueFrom(pbxFile, "title", r.FormValue("title"))
-				Data.File = r.FormValue("file")
-				if Data.File == "" {
-					Data.File = pbx
-				}
-				Data.Url = GetConfigValueFrom(pbxFile, "url", r.FormValue("url"))
-				Data.AMIUser = GetConfigValueFrom(pbxFile, "amiuser", r.FormValue("amiuser"))
-				Data.AMIPass = GetConfigValueFrom(pbxFile, "amipass", r.FormValue("amipass"))
-				var err error
-				Data.RemoteConfig, err = GetRemoteFile(Data.Url)
+				err := mytemplate.ExecuteTemplate(w, "pbx.html", Data)
 				if err != nil {
-					Data.Message = "Error: " + err.Error()
-					Data.MessageType = "errormessage"
-				} else if strings.TrimSpace(Data.RemoteConfig) == "" {
-					Data.RemoteConfig = "amiurl=http://localhost:8088/rawman\n" +
-						"cdrdbserver=\n" +
-						"cdrdatabase=\n" +
-						"cdruser=\n" +
-						"cdrpass=\n" +
-						"cdrtable=\n" +
-						"cdrkeyfield="
+					WriteLog("Error in executeTemplate pbx.html edit: " + err.Error())
 				}
-				if Data.Count == 0 {
-					Data.Count = len(GetPBXFiles()) + 1
-				}
-				getPBXDefualt(&Data)
 			}
-			err := mytemplate.ExecuteTemplate(w, "pbx.html", Data)
-			if err != nil {
-				WriteLog("Error in executeTemplate pbx.html edit: " + err.Error())
-			}
+		} else {
+			http.Redirect(w, r, "Home", http.StatusTemporaryRedirect)
 		}
 	} else {
 		http.Redirect(w, r, "Login", http.StatusTemporaryRedirect)
