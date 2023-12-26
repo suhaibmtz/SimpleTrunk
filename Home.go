@@ -209,7 +209,7 @@ func AddPBX(w http.ResponseWriter, r *http.Request) {
 		getPBXData(r, &Data)
 		if r.FormValue("add") != "" {
 			if !PBXEmpty(&Data) {
-				success := SavePbx(&Data, false)
+				success := SavePbx(&Data, "")
 				if success {
 					WriteLog(User.Name + " Added: " + Data.File)
 					http.Redirect(w, r, "Home", http.StatusTemporaryRedirect)
@@ -242,7 +242,7 @@ func EditPBX(w http.ResponseWriter, r *http.Request) {
 			getPBXData(r, &Data)
 			if r.FormValue("add") != "" {
 				if !PBXEmpty(&Data) {
-					success := SavePbx(&Data, pbx == Data.File)
+					success := SavePbx(&Data, pbx)
 					if success {
 						if Data.RemoteConfig != "" {
 							res, err := SaveRemoteFile(Data.Url, "/etc/simpletrunk/stagent.ini", Data.RemoteConfig)

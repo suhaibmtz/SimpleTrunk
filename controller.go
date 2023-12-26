@@ -8,6 +8,8 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
+	"regexp"
 	"strconv"
 	"strings"
 )
@@ -276,19 +278,27 @@ func GetRemoteFile(url string) (text string, err error) {
 	return
 }
 
-func SavePbx(Data *PBXType, edit bool) (success bool) {
+func SavePbx(Data *PBXType, old string) (success bool) {
 	CheckFolder()
+	edit := old == Data.File
+	if old != Data.File {
+
+	}
 	dir := GetPBXDir()
 	if !strings.Contains(Data.File, ".") {
 		Data.File += ".stc"
 	}
 
 	file := dir + Data.File
-	if FileExist(Data.File) && !edit {
+	fmt.Println(FileExist(file), file, edit)
+	if FileExist(file) && !edit {
 		success = false
 		Data.Message = "Already Exist"
 		Data.MessageType = "errormessage"
 	} else {
+		if !edit {
+			os.Remove(dir + old)
+		}
 		Data.Url = strings.ReplaceAll(Data.Url, `\`, "")
 		success = SetConfigValueTo(file, "url", Data.Url)
 		if success {
@@ -957,8 +967,8 @@ func (n *NodeInfoType) AddLine(line string) {
 }
 
 func (n *NodeInfoType) IsNumeric(str string) bool {
-	// return strings.("[+-]?\\d*(\\.\\d+)?");
-	return true
+	num, _ := regexp.MatchString("[+-]?\\d*(\\.\\d+)?", str)
+	return num
 }
 
 func (n *NodeInfoType) GetProperty(name string) (value string) {

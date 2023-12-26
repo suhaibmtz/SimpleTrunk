@@ -1096,8 +1096,8 @@ func AMIparamStatus(request *http.Request, admin bool) bool {
 	return (request.FormValue("adf") == "" && request.FormValue("edf") == "") || !admin
 }
 
-func CDRparamStatus(request *http.Request) bool {
-	return request.FormValue("cf") == "" && request.FormValue("edit") == ""
+func CDRparamStatus(request *http.Request, admin bool) bool {
+	return (request.FormValue("cf") == "" && request.FormValue("edit") == "") || !admin
 }
 
 func setDefault(w http.ResponseWriter, Aurl, pbxfile string, r *http.Request, uname string) (err error) {
@@ -1217,31 +1217,29 @@ func AMIConfig(w http.ResponseWriter, r *http.Request) {
 					http.Redirect(w, r, "AMIConfig", http.StatusTemporaryRedirect)
 				}
 			}
-			if r.FormValue("aok") != "" {
-				if User.Admin {
-					err = doAddAMIUser(r, w, AgentUrl)
-					if err != nil {
-						Data.Message = "Error: " + err.Error()
-						Data.MessageType = "errormessage"
-					}
-				}
-			}
 			if r.FormValue("adf") != "" {
 				if User.Admin {
+					if r.FormValue("aok") != "" {
+						err = doAddAMIUser(r, w, AgentUrl)
+						if err != nil {
+							Data.Message = "Error: " + err.Error()
+							Data.MessageType = "errormessage"
+						}
+					}
 					err = mytemplate.ExecuteTemplate(w, "AMIConfigAdf.html", Data)
 				} else {
 					http.Redirect(w, r, "AMIConfig", http.StatusTemporaryRedirect)
 				}
 			}
-			if r.FormValue("mok") != "" && User.Admin {
-				err = doModAMIUser(r, w, AgentUrl)
-				if err != nil {
-					Data.Message = "Error: " + err.Error()
-					Data.MessageType = "errormessage"
-				}
-			}
 			if r.FormValue("edf") != "" {
 				if User.Admin {
+					if r.FormValue("mok") != "" {
+						err = doModAMIUser(r, w, AgentUrl)
+						if err != nil {
+							Data.Message = "Error: " + err.Error()
+							Data.MessageType = "errormessage"
+						}
+					}
 					err, Data.Spl, Data.User = editAMIUserForm(AgentUrl, r.FormValue("edf"))
 					if err != nil {
 						Data.Message = "Error: " + err.Error()
@@ -1254,10 +1252,8 @@ func AMIConfig(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 			if AMIparamStatus(r, User.Admin) {
-				Data.Users, Data.Success, err = AMIUsers(pbxfile, AgentUrl)
-				if err == nil {
-					err, Data.Ami, Data.Http = AMIStatus(AgentUrl)
-				}
+				Data.Users, Data.Success, _ = AMIUsers(pbxfile, AgentUrl)
+				err, Data.Ami, Data.Http = AMIStatus(AgentUrl)
 				if err != nil {
 					Data.Message = "Error: " + err.Error()
 					Data.MessageType = "errormessage"
@@ -1418,7 +1414,7 @@ func CDRConfig(w http.ResponseWriter, r *http.Request) {
 				Data.MessageType = "errormessage"
 			}
 			Data.Connected = err == nil
-			if CDRparamStatus(r) {
+			if CDRparamStatus(r, User.Admin) {
 				json.Unmarshal(checkRes, &chres)
 				chsuccess := chres.Success
 				csres, _ := checkCDRStatus(AgentUrl)
@@ -1439,7 +1435,7 @@ func CDRConfig(w http.ResponseWriter, r *http.Request) {
 				}
 				err = mytemplate.ExecuteTemplate(w, "CDRConfig.html", Data)
 			}
-			if r.FormValue("cf") != "" {
+			if r.FormValue("cf") != "" && User.Admin {
 				if r.FormValue("cok") != "" {
 					ser := r.FormValue("ser")
 					dbuname := r.FormValue("duname")
@@ -1470,7 +1466,7 @@ func CDRConfig(w http.ResponseWriter, r *http.Request) {
 				}
 				err = mytemplate.ExecuteTemplate(w, "CDRConfigCf.html", Data)
 			}
-			if r.FormValue("edit") != "" {
+			if r.FormValue("edit") != "" && User.Admin {
 				if r.FormValue("mcok") != "" {
 					ser := r.FormValue("ser")
 					dbuname := r.FormValue("duname")
