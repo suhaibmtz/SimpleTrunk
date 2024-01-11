@@ -667,85 +667,87 @@ func GetSystemStatus(url string) (System SystemStatusType, err error) {
 	// CPU Utilization
 	var res ResponseType
 	res, err = executeShell("top -b  | head -14 ", url)
-	loadStr := res.Result
-	toplines := strings.Split(loadStr, "\n")
-	percent := "-1"
-	if len(toplines) > 2 {
-		percent = toplines[2]
-	}
-	//%Cpu(s): 31.3 us, 9.0 sy, 0.0 ni, 59.7 id, 0.0 wa, 0.0 hi, 0.0 si, 0.0 st %
-	percent = percent[0:strings.Index(percent, "id")]
-	percent = percent[strings.LastIndex(percent, ",")+1 : len(percent)]
-	percent = strings.TrimSpace(percent)
-	utilization, _ := strconv.ParseFloat(percent, 32)
-	utilization = 100 - utilization
-	result, _ := executeShell("nproc", url)
-	var bgcolor string
-	proc := strings.ReplaceAll(result.Result, "\n", "")
-	procCount, _ := strconv.Atoi(proc)
-
-	bgcolor = "#AAFFAA"
-	if utilization > 100 {
-		bgcolor = "#990000"
-	} else if utilization > 90 {
-		bgcolor = "#FF5555"
-	} else if utilization > 50 {
-		bgcolor = "#FFFFaa"
-	}
-	if utilization > 100 {
-		utilization = 100
-	} else if utilization == 0 {
-		bgcolor = "#FFFFFF"
-	}
-
-	System.BGColor = bgcolor
-	System.Percent = fmt.Sprintf("%0.1f", utilization)
-
-	result, _ = executeShell("date", url)
-	System.Time = result.Result
-	System.ProcCount = procCount
-
-	result, _ = executeShell("ip a", url)
-	ipList := strings.Split(result.Result, "\n")
-	for _, ip := range ipList {
-		if strings.Contains(ip, "inet ") && !strings.Contains(ip, "127.0.") {
-			ip = strings.TrimSpace(ip)
-			ip = ip[strings.Index(ip, " "):len(ip)]
-			ip = strings.TrimSpace(ip)
-			ip = ip[0:strings.Index(ip, " ")]
-			System.IP = ip
-			break
+	if err == nil {
+		loadStr := res.Result
+		toplines := strings.Split(loadStr, "\n")
+		percent := "-1"
+		if len(toplines) > 2 {
+			percent = toplines[2]
 		}
-	}
-	for i := 6; i < len(toplines); i++ {
-		System.TopProc = append(System.TopProc, toplines[i])
-	}
+		//%Cpu(s): 31.3 us, 9.0 sy, 0.0 ni, 59.7 id, 0.0 wa, 0.0 hi, 0.0 si, 0.0 st %
+		percent = percent[0:strings.Index(percent, "id")]
+		percent = percent[strings.LastIndex(percent, ",")+1 : len(percent)]
+		percent = strings.TrimSpace(percent)
+		utilization, _ := strconv.ParseFloat(percent, 32)
+		utilization = 100 - utilization
+		result, _ := executeShell("nproc", url)
+		var bgcolor string
+		proc := strings.ReplaceAll(result.Result, "\n", "")
+		procCount, _ := strconv.Atoi(proc)
 
-	result, _ = executeShell("free -m", url)
-	System.Memory = result.Result
+		bgcolor = "#AAFFAA"
+		if utilization > 100 {
+			bgcolor = "#990000"
+		} else if utilization > 90 {
+			bgcolor = "#FF5555"
+		} else if utilization > 50 {
+			bgcolor = "#FFFFaa"
+		}
+		if utilization > 100 {
+			utilization = 100
+		} else if utilization == 0 {
+			bgcolor = "#FFFFFF"
+		}
 
-	result, _ = executeShell("df -h", url)
-	lines := strings.Split(result.Result, "\n")
-	for _, line := range lines {
-		var record UsageLineType
-		record.Line = line
-		if strings.Contains(line, "/") && strings.Contains(line, "%") {
-			usageStr := line[strings.Index(line, " "):strings.Index(line, "%")]
-			usageStr = strings.TrimSpace(usageStr)
-			for strings.Contains(usageStr, " ") {
-				usageStr = usageStr[strings.Index(usageStr, " "):len(usageStr)]
+		System.BGColor = bgcolor
+		System.Percent = fmt.Sprintf("%0.1f", utilization)
+
+		result, _ = executeShell("date", url)
+		System.Time = result.Result
+		System.ProcCount = procCount
+
+		result, _ = executeShell("ip a", url)
+		ipList := strings.Split(result.Result, "\n")
+		for _, ip := range ipList {
+			if strings.Contains(ip, "inet ") && !strings.Contains(ip, "127.0.") {
+				ip = strings.TrimSpace(ip)
+				ip = ip[strings.Index(ip, " "):len(ip)]
+				ip = strings.TrimSpace(ip)
+				ip = ip[0:strings.Index(ip, " ")]
+				System.IP = ip
+				break
+			}
+		}
+		for i := 6; i < len(toplines); i++ {
+			System.TopProc = append(System.TopProc, toplines[i])
+		}
+
+		result, _ = executeShell("free -m", url)
+		System.Memory = result.Result
+
+		result, _ = executeShell("df -h", url)
+		lines := strings.Split(result.Result, "\n")
+		for _, line := range lines {
+			var record UsageLineType
+			record.Line = line
+			if strings.Contains(line, "/") && strings.Contains(line, "%") {
+				usageStr := line[strings.Index(line, " "):strings.Index(line, "%")]
 				usageStr = strings.TrimSpace(usageStr)
+				for strings.Contains(usageStr, " ") {
+					usageStr = usageStr[strings.Index(usageStr, " "):len(usageStr)]
+					usageStr = strings.TrimSpace(usageStr)
+				}
+				usage, _ := strconv.ParseFloat(usageStr, 32)
+				if usage > 80 {
+					record.Color = "brown"
+					record.IsFont = true
+				} else if usage > 60 {
+					record.Color = "#ee7766"
+					record.IsFont = true
+				}
 			}
-			usage, _ := strconv.ParseFloat(usageStr, 32)
-			if usage > 80 {
-				record.Color = "brown"
-				record.IsFont = true
-			} else if usage > 60 {
-				record.Color = "#ee7766"
-				record.IsFont = true
-			}
+			System.Lines = append(System.Lines, record)
 		}
-		System.Lines = append(System.Lines, record)
 	}
 	return
 }
