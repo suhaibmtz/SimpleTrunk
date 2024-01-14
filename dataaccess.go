@@ -2,6 +2,7 @@ package main
 
 import (
 	"database/sql"
+	"fmt"
 	"io/fs"
 	"io/ioutil"
 	"os"
@@ -17,6 +18,7 @@ var DB *sql.DB
 func init() {
 	home, err := os.UserHomeDir()
 	simpletrunkPath = home + "/simpletrunk"
+	fmt.Println("Home path: " + simpletrunkPath)
 	connectDB()
 	if err != nil {
 		WriteLog("Error in get home: " + err.Error())

@@ -4,65 +4,79 @@ package main
 import (
 	"html/template"
 	"net/http"
+	"strings"
 )
 
 var mytemplate *template.Template
+var PREFIX string
 
 const Version = "1.0.0 25Dec"
 
 func main() {
+
+	PREFIX = GetConfigValue("prefix", "/SimpleTrunk")
+	if !strings.HasPrefix(PREFIX, "/") {
+		PREFIX = "/" + PREFIX
+	}
+	prefix := PREFIX
 	mytemplate = template.Must(template.ParseGlob("*templates/*.html"))
-	http.Handle("/SimpleTrunk/static/", http.StripPrefix("/SimpleTrunk/static/", http.FileServer(http.Dir("./static"))))
-	http.HandleFunc("/SimpleTrunk/", Index)
+	http.Handle(prefix+"/static/", http.StripPrefix(prefix+"/static/", http.FileServer(http.Dir("./static"))))
+	http.HandleFunc(prefix+"/", Index)
+	http.HandleFunc(prefix, redirect)
+	http.HandleFunc("/", redirect)
 
 	//Login
-	http.HandleFunc("/SimpleTrunk/login", Login)
-	http.HandleFunc("/SimpleTrunk/Login", Login)
-	http.HandleFunc("/SimpleTrunk/Logout", Logout)
+	http.HandleFunc(prefix+"/login", Login)
+	http.HandleFunc(prefix+"/Login", Login)
+	http.HandleFunc(prefix+"/Logout", Logout)
 
 	//Home
-	http.HandleFunc("/SimpleTrunk/Home", Home)
-	http.HandleFunc("/SimpleTrunk/AddPBX", AddPBX)
-	http.HandleFunc("/SimpleTrunk/EditPBX", EditPBX)
-	http.HandleFunc("/SimpleTrunk/SelectPBX", SelectPBX)
+	http.HandleFunc(prefix+"/Home", Home)
+	http.HandleFunc(prefix+"/AddPBX", AddPBX)
+	http.HandleFunc(prefix+"/EditPBX", EditPBX)
+	http.HandleFunc(prefix+"/SelectPBX", SelectPBX)
 
 	//Advanced
-	http.HandleFunc("/SimpleTrunk/Advanced", Advanced)
-	http.HandleFunc("/SimpleTrunk/Status", Status)
-	http.HandleFunc("/SimpleTrunk/SIPNodes", SIPNodes)
-	http.HandleFunc("/SimpleTrunk/EditNode", EditNode)
-	http.HandleFunc("/SimpleTrunk/Dialplan", Dialplan)
-	http.HandleFunc("/SimpleTrunk/Commands", Commands)
-	http.HandleFunc("/SimpleTrunk/AMI", AMI)
-	http.HandleFunc("/SimpleTrunk/Terminal", Terminal)
-	http.HandleFunc("/SimpleTrunk/Logs", Logs)
-	http.HandleFunc("/SimpleTrunk/Config", Config)
-	http.HandleFunc("/SimpleTrunk/Backup", Backup)
-	http.HandleFunc("/SimpleTrunk/AMIConfig", AMIConfig)
-	http.HandleFunc("/SimpleTrunk/CDRConfig", CDRConfig)
+	http.HandleFunc(prefix+"/Advanced", Advanced)
+	http.HandleFunc(prefix+"/Status", Status)
+	http.HandleFunc(prefix+"/SIPNodes", SIPNodes)
+	http.HandleFunc(prefix+"/EditNode", EditNode)
+	http.HandleFunc(prefix+"/Dialplan", Dialplan)
+	http.HandleFunc(prefix+"/Commands", Commands)
+	http.HandleFunc(prefix+"/AMI", AMI)
+	http.HandleFunc(prefix+"/Terminal", Terminal)
+	http.HandleFunc(prefix+"/Logs", Logs)
+	http.HandleFunc(prefix+"/Config", Config)
+	http.HandleFunc(prefix+"/Backup", Backup)
+	http.HandleFunc(prefix+"/AMIConfig", AMIConfig)
+	http.HandleFunc(prefix+"/CDRConfig", CDRConfig)
 	//Advanced Files
-	http.HandleFunc("/SimpleTrunk/Files", Files)
-	http.HandleFunc("/SimpleTrunk/BackupFiles", BackupFiles)
-	http.HandleFunc("/SimpleTrunk/CompareFiles", CompareFiles)
-	http.HandleFunc("/SimpleTrunk/EditFile", EditFile)
+	http.HandleFunc(prefix+"/Files", Files)
+	http.HandleFunc(prefix+"/BackupFiles", BackupFiles)
+	http.HandleFunc(prefix+"/CompareFiles", CompareFiles)
+	http.HandleFunc(prefix+"/EditFile", EditFile)
 	//Sound
-	http.HandleFunc("/SimpleTrunk/UploadSound", UploadSound)
-	http.HandleFunc("/SimpleTrunk/PlaySound", PlaySound)
-	http.HandleFunc("/SimpleTrunk/UploadSoundFile", UploadSoundFile)
+	http.HandleFunc(prefix+"/UploadSound", UploadSound)
+	http.HandleFunc(prefix+"/PlaySound", PlaySound)
+	http.HandleFunc(prefix+"/UploadSoundFile", UploadSoundFile)
 
 	//PBX
-	http.HandleFunc("/SimpleTrunk/PBX", PBX)
-	http.HandleFunc("/SimpleTrunk/Extensions", Extensions)
-	http.HandleFunc("/SimpleTrunk/Dialplans", Dialplans)
-	http.HandleFunc("/SimpleTrunk/Functions", Functions)
-	http.HandleFunc("/SimpleTrunk/Monitor", Monitor)
+	http.HandleFunc(prefix+"/PBX", PBX)
+	http.HandleFunc(prefix+"/Extensions", Extensions)
+	http.HandleFunc(prefix+"/Dialplans", Dialplans)
+	http.HandleFunc(prefix+"/Functions", Functions)
+	http.HandleFunc(prefix+"/Monitor", Monitor)
 
 	//Admin
-	http.HandleFunc("/SimpleTrunk/Admin", Admin)
+	http.HandleFunc(prefix+"/Admin", Admin)
 
-	println("http://localhost:10025/SimpleTrunk")
+	println("http://localhost:10025" + prefix)
 	err := http.ListenAndServe(":10025", nil)
 	if err != nil {
 		println(err.Error())
 	}
+}
+
+func redirect(w http.ResponseWriter, r *http.Request) {
+	http.Redirect(w, r, PREFIX+"/", http.StatusTemporaryRedirect)
 }
