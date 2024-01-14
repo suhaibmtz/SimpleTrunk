@@ -53,14 +53,12 @@ body
 
 pre
 {
-/*    white-space: pre-wrap;*/
-/*	white-space: break-spaces;*/
 	margin: 0;
 	padding: 7;
 	color: #444444;
 	background-color: #FFFFeF;
 	font: 1em/1.2 "Courier 10 Pitch", "Courier New", Arial, Geneva, sans-serif;
-        border: 2px #55AA55 solid;
+        border: 2px #0600bd solid;
 	border-radius: 15px;
         
 }
@@ -204,7 +202,7 @@ Layout styles
 
 .nav-bar
 {
-	background: gray;
+	background: #2d5584;
 	padding: 0;
 }
 
@@ -217,7 +215,7 @@ Layout styles
 .footer
 {
 	color: #fff;
-	background: gray;
+	background: #2d5584;
         
 }
 
@@ -296,7 +294,7 @@ Single styles
 .btn:hover
 {
 	color: #fff !important;
-	background-color: green;
+	background-color: #002c39;
 }
 
 .btn:focus
@@ -373,7 +371,7 @@ table.dtable th, table.logs
 th {
   
   
-background:#ADADAD;
+background:#3264C6;
   color:#FFF;
 }
 
@@ -414,7 +412,7 @@ th {
 
     
     font-weight:bold;
-    background:#eeeecc;
+    background:#b9d3ee;
     padding-left:5px;
    /* width: 210px; */
 }

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"strings"
 
 	"github.com/motaz/codeutils"
@@ -56,6 +57,22 @@ type GetFileResponseType struct {
 	Filetime string `json:"filetime"`
 }
 
+func RemoveColons() {
+	Files := GetPBXFilesInfo()
+	dir := GetPBXDir()
+	for _, f := range Files {
+		old := GetPBXFileString(f.Name())
+		fileStr := strings.ReplaceAll(old, `\`, "")
+		if old != fileStr {
+			file, err := os.OpenFile(dir+f.Name(), os.O_RDWR, 0)
+			if err == nil {
+				WriteLog("removed colons from " + f.Name())
+				file.WriteString(fileStr)
+			}
+		}
+	}
+}
+
 func restCallURL(url string, data []byte) (value []byte, err error) {
 	var res *http.Response
 	url = strings.TrimSpace(url)
@@ -66,6 +83,11 @@ func restCallURL(url string, data []byte) (value []byte, err error) {
 	}
 	if err == nil {
 		value, err = io.ReadAll(res.Body)
+	} else if strings.Contains(err.Error(), "URL cannot contain colon") {
+		err = nil
+		go RemoveColons()
+		url = strings.ReplaceAll(url, `\`, "")
+		value, err = restCallURL(url, data)
 	}
 	return
 }
