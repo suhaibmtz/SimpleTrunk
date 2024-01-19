@@ -330,7 +330,7 @@ type QueueType struct {
 	Eq          bool
 }
 
-func GetChannelID(pbxfile, queue, agent string) (channelIDs []string) {
+func GetChannelIDs(pbxfile, queue, agent string) (channelIDs []string) {
 
 	op, _ := callAMI(pbxfile, "core show channels concise")
 	if op.Success {
@@ -378,28 +378,40 @@ func FuncsGetCallInfo(pbxfile, channel string) (callInfo CallInfoType) {
 
 func GetStatusOf(pbxfile string, has bool, keyword string) (isBusy bool, queues []QueueType, count int, newKeyword string, err error) {
 
-	isBusy = keyword == "Busy"
-
-	var result ResponseType
-	result, err = callAMICommand(pbxfile, "queue show")
+	result, _ := callAMICommand(pbxfile, "queue show")
 	if result.Success {
-		lines := strings.Split(result.Message, "\n")
-		count = 0
-		var queue string
-		for _, line := range lines {
-			var record QueueType
-			if strings.Contains(line, "holdtime") {
-				queue = line[0:strings.Index(strings.TrimSpace(line), " ")]
-			}
-			if isBusy {
-				record.DisplayLine = (strings.Contains(line, "Agent/") || strings.Contains(line, "SIP/") || strings.Contains(line, "Local/")) &&
-					isBusy && (strings.Contains(line, "in call")) && (!strings.Contains(line, "Not in use"))
-			} else if keyword == "paused" {
-				record.DisplayLine = (strings.Contains(line, "Agent/") || strings.Contains(line, "SIP/") || strings.Contains(line, "Local/")) &&
-					(has && strings.Contains(line, keyword) || (!has && !strings.Contains(line, keyword)))
+		return GetStatusOfText(result.Message, pbxfile, has, keyword)
+	}
+	return
+}
 
-			}
+func GetStatusOfText(text, pbxfile string, has bool, keyword string) (isBusy bool, queues []QueueType, count int, newKeyword string, err error) {
 
+	isBusy = keyword == "Busy"
+	lines := strings.Split(text, "\n")
+	count = 0
+	var queue string
+	started := false
+	for _, line := range lines {
+		line = strings.Replace(line, "Output:", "", 6)
+		var record QueueType
+		if strings.Contains(line, "holdtime") {
+			queue = line[0 : strings.Index(strings.TrimSpace(line), " ")+1]
+		}
+		if strings.Contains(line, "Members") {
+			started = true
+		}
+		if strings.Contains(line, "Callers") {
+			started = false
+		}
+		if started {
+			if strings.Contains(line, "Agent/") || strings.Contains(line, "SIP/") || strings.Contains(line, "Local/") {
+				if isBusy {
+					record.DisplayLine = strings.Contains(line, "in call") && !strings.Contains(line, "Not in use")
+				} else if keyword == "paused" {
+					record.DisplayLine = has && strings.Contains(line, keyword) || (!has && !strings.Contains(line, keyword))
+				}
+			}
 			if record.DisplayLine {
 				count++
 
@@ -424,9 +436,9 @@ func GetStatusOf(pbxfile string, has bool, keyword string) (isBusy bool, queues 
 					}
 				}
 
-				if queue == "" {
-					queue = "-"
-				}
+				// if queue == "" {
+				// 	queue = "-"
+				// }
 
 				if strings.Contains(line, "(") {
 					line = line[strings.Index(line, "("):len(line)]
@@ -440,7 +452,7 @@ func GetStatusOf(pbxfile string, has bool, keyword string) (isBusy bool, queues 
 				}
 				record.CallInfo.CallerID = "-"
 				record.CallInfo.Time = "-"
-				channelIDs := GetChannelID(pbxfile, record.Queue, record.Member)
+				channelIDs := GetChannelIDs(pbxfile, record.Queue, record.Member)
 				if len(channelIDs) != 0 {
 					for _, channelID := range channelIDs {
 						call := FuncsGetCallInfo(pbxfile, channelID)
@@ -464,18 +476,18 @@ func GetStatusOf(pbxfile string, has bool, keyword string) (isBusy bool, queues 
 					out.println("</form></td>");
 				    }
 				*/
-			}
-			if queue != "-" && queue != "" && record != (QueueType{}) {
-				record.Queue = queue
-				queue = ""
-				queues = append(queues, record)
+				if queue != "-" && record != (QueueType{}) {
+					record.Queue = queue
+					queue = ""
+					queues = append(queues, record)
+				}
 			}
 		}
+	}
 
-		if count == 0 {
-			if !has {
-				keyword = "Un" + keyword
-			}
+	if count == 0 {
+		if !has {
+			keyword = "Un" + keyword
 		}
 	}
 	newKeyword = keyword
@@ -493,10 +505,11 @@ func GetWaiting(pbxfile string) (count int, queues []QueueType, err error) {
 		started := false
 		lastQueue := ""
 		for _, line := range lines {
+			line = strings.Replace(line, "Output: ", "", 8)
 			var record QueueType
 
 			if strings.Contains(line, "holdtime") && strings.Contains(line, " ") {
-				queue = strings.TrimSpace(line[0:strings.Index(line, " ")])
+				queue = strings.TrimSpace(line[0 : strings.Index(line, " ")+1])
 			}
 			if strings.TrimSpace(line) == "" {
 				started = false
@@ -504,8 +517,9 @@ func GetWaiting(pbxfile string) (count int, queues []QueueType, err error) {
 			if started {
 
 				channel := ""
-				if strings.Contains(line, ".") && strings.Contains(line, "(") {
-					channel = strings.TrimSpace(line[strings.Index(line, ".")+1 : strings.Index(line, "(")])
+				lineDot := strings.Index(line, ".") + 1
+				if strings.Contains(line, ".") && strings.Contains(line, "(") && lineDot < len(line) {
+					channel = strings.TrimSpace(line[lineDot+1 : strings.Index(line, "(")])
 				}
 
 				//String info[] = General.getCallInfo(pbxfile, callid);
@@ -517,7 +531,9 @@ func GetWaiting(pbxfile string) (count int, queues []QueueType, err error) {
 
 				lastQueue = queue
 
-				line = line[strings.Index(line, "("):len(line)]
+				if strings.Contains(line, "(") {
+					line = line[strings.Index(line, "("):len(line)]
+				}
 				record.Line = line
 				record.Channel = channel
 
@@ -579,7 +595,7 @@ func Functions(w http.ResponseWriter, r *http.Request) {
 			case "talk":
 				keyword = "Busy"
 				has = true
-				Data.WCount, Data.Waiting, _ = GetWaiting(pbx)
+				Data.WCount, Data.Waiting, err = GetWaiting(pbx)
 			}
 			Data.IsBusy, Data.Queues, Data.Count, Data.Keyword, err = GetStatusOf(pbx, has, keyword)
 			if err != nil {

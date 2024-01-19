@@ -60,16 +60,16 @@ bgcolor='#FFFFcc'
 <font color=green><b><label id=waitcount></label></b></font> Customers
 <table class=tform>
 <tr><th>Queue</th><th>Channel</th><th>Caller ID</th><th>Application</th><th>Info</th></tr>
-</td><tr></table>
 {{range .Waiting}}
-<tr><td><b><tr><td><b>{{if .Eq}}{{.Queue}}{{end}}</b></td>
+<tr><td><b>{{if .Eq}}{{.Queue}}{{end}}</b></td>
 <td>{{.Channel}}</td>
-<td>{{.Caller.callerID}}</td>
-<td>{{.Caller.application}}</td>
+<td>{{.CallInfo.CallerID}}</td>
+<td>{{.CallInfo.Application}}</td>
 <td  style='font-size:12'>{{.Line}}</td>
 </tr>
 {{end}}
 </table>
+</td></tr></table>
 {{ if eq .WCount 0}}
 There is no waiting customer
 {{else}}
