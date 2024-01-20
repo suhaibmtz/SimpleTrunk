@@ -349,11 +349,11 @@ func GetChannelIDs(pbxfile, queue, agent string) (channelIDs []string) {
 func FuncsGetCallInfo(pbxfile, channel string) (callInfo CallInfoType) {
 
 	callInfo.CallerID = ""
-	op, _ := callAMI(pbxfile, "core show channel "+channel)
+	op, _ := callAMICommand(pbxfile, "core show channel "+channel)
 	if op.Success {
 		lines := strings.Split(op.Message, "\n")
 		for _, line := range lines {
-			if strings.Contains(line, "Caller ID Name:") {
+			if strings.Contains(line, "Caller ID:") {
 				callInfo.CallerID = strings.TrimSpace(line[strings.Index(line, ":")+1 : len(line)])
 			}
 			if strings.Contains(line, "Application") {
@@ -496,9 +496,12 @@ func GetStatusOfText(text, pbxfile string, has bool, keyword string) (isBusy boo
 
 func GetWaiting(pbxfile string) (count int, queues []QueueType, err error) {
 
-	op, _ := callAMI(pbxfile, "queue show")
+	op, _ := callAMICommand(pbxfile, "queue show")
 	if op.Success {
 		text := op.Message
+		if text == "" {
+			text = op.Result
+		}
 		queue := ""
 
 		lines := strings.Split(text, "\n")
