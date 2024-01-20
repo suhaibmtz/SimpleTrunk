@@ -332,7 +332,7 @@ type QueueType struct {
 
 func GetChannelIDs(pbxfile, queue, agent string) (channelIDs []string) {
 
-	op, _ := callAMI(pbxfile, "core show channels concise")
+	op, _ := callAMICommand(pbxfile, "core show channels concise")
 	if op.Success {
 		lines := strings.Split(op.Message, "\n")
 		for _, line := range lines {
@@ -350,25 +350,28 @@ func FuncsGetCallInfo(pbxfile, channel string) (callInfo CallInfoType) {
 
 	callInfo.CallerID = ""
 	op, _ := callAMICommand(pbxfile, "core show channel "+channel)
-	if op.Success {
+	if op.Success || true {
 		lines := strings.Split(op.Message, "\n")
 		for _, line := range lines {
+			Get := func(line string) string {
+				return strings.TrimSpace(line[strings.Index(line, ":")+1 : len(line)])
+			}
 			if strings.Contains(line, "Caller ID:") {
-				callInfo.CallerID = strings.TrimSpace(line[strings.Index(line, ":")+1 : len(line)])
+				callInfo.CallerID = Get(line)
 			}
 			if strings.Contains(line, "Application") {
-				callInfo.Application = strings.TrimSpace(line[strings.Index(line, ":")+1 : len(line)])
+				callInfo.Application = Get(line)
 			}
 			if strings.Contains(line, "Elapsed") {
-				callInfo.Time = strings.TrimSpace(line[strings.Index(line, ":")+1 : len(line)])
+				callInfo.Time = Get(line)
 			}
 
 			if strings.Contains(line, "Connected Line ID:") && strings.Contains(callInfo.CallerID, "N/A") {
-				callInfo.CallerID = strings.TrimSpace(line[strings.Index(line, ":")+1 : len(line)])
+				callInfo.CallerID = Get(line)
 			}
 
 			if strings.Contains(line, "DNID Digits:") && strings.Contains(callInfo.CallerID, ("N/A")) {
-				callInfo.CallerID = strings.TrimSpace(line[strings.Index(line, ":")+1 : len(line)])
+				callInfo.CallerID = Get(line)
 			}
 		}
 	}
@@ -452,7 +455,7 @@ func GetStatusOfText(text, pbxfile string, has bool, keyword string) (isBusy boo
 				}
 				record.CallInfo.CallerID = "-"
 				record.CallInfo.Time = "-"
-				channelIDs := GetChannelIDs(pbxfile, record.Queue, record.Member)
+				channelIDs := GetChannelIDs(pbxfile, queue, record.Member)
 				if len(channelIDs) != 0 {
 					for _, channelID := range channelIDs {
 						call := FuncsGetCallInfo(pbxfile, channelID)
@@ -478,7 +481,7 @@ func GetStatusOfText(text, pbxfile string, has bool, keyword string) (isBusy boo
 				*/
 				if queue != "-" && record != (QueueType{}) {
 					record.Queue = queue
-					queue = ""
+					// queue = ""
 					queues = append(queues, record)
 				}
 			}
