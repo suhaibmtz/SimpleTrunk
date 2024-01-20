@@ -350,11 +350,15 @@ func FuncsGetCallInfo(pbxfile, channel string) (callInfo CallInfoType) {
 
 	callInfo.CallerID = ""
 	op, _ := callAMICommand(pbxfile, "core show channel "+channel)
-	if op.Success || true {
+	if op.Success {
 		lines := strings.Split(op.Message, "\n")
 		for _, line := range lines {
 			Get := func(line string) string {
-				return strings.TrimSpace(line[strings.Index(line, ":")+1 : len(line)])
+				if strings.HasPrefix(line, "Output:") {
+					line = strings.TrimSpace(line[strings.Index(line, ":")+1:])
+				}
+				line = strings.TrimSpace(line[strings.Index(line, ":")+1:])
+				return line
 			}
 			if strings.Contains(line, "Caller ID:") {
 				callInfo.CallerID = Get(line)
