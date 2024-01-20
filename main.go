@@ -10,7 +10,7 @@ import (
 var mytemplate *template.Template
 var PREFIX string
 
-const Version = "1.2.0 19Jan"
+const Version = "1.0.0 25Dec"
 
 func main() {
 
