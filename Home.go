@@ -90,7 +90,7 @@ func Login(w http.ResponseWriter, r *http.Request) {
 					Value: key,
 				}
 				if Data.RememberMe {
-					cookie.MaxAge = 60 * 60 * 24 * 7
+					cookie.MaxAge = 60 * 60 * 24 * 30
 				}
 				http.SetCookie(w, cookie)
 				http.Redirect(w, r, "Home", http.StatusTemporaryRedirect)
@@ -146,8 +146,9 @@ func SelectPBX(w http.ResponseWriter, r *http.Request) {
 	pbx := r.FormValue("pbx")
 	if pbx != "" && pbx != "--Select PBX--" {
 		http.SetCookie(w, &http.Cookie{
-			Name:  "file",
-			Value: pbx,
+			Name:   "file",
+			Value:  pbx,
+			MaxAge: 60 * 60 * 24 * 30,
 		})
 		http.Redirect(w, r, "Status", http.StatusTemporaryRedirect)
 	} else {
