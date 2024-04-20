@@ -2,6 +2,8 @@
 package main
 
 import (
+	"embed"
+	"fmt"
 	"html/template"
 	"net/http"
 	"strings"
@@ -12,6 +14,12 @@ var PREFIX string
 
 const Version = "1.2.1 29Jan"
 
+//go:embed static
+var static embed.FS
+
+//go:embed *templates
+var templates embed.FS
+
 func main() {
 
 	PREFIX = GetConfigValue("prefix", "/SimpleTrunk")
@@ -19,8 +27,12 @@ func main() {
 		PREFIX = "/" + PREFIX
 	}
 	prefix := PREFIX
-	mytemplate = template.Must(template.ParseGlob("*templates/*.html"))
-	http.Handle(prefix+"/static/", http.StripPrefix(prefix+"/static/", http.FileServer(http.Dir("./static"))))
+	var err error
+	mytemplate, err = template.ParseFS(templates, "*templates/*.html")
+	if err != nil {
+		fmt.Println("PraseFS:", err.Error())
+	}
+	http.Handle(prefix+"/static/", http.StripPrefix(prefix, http.FileServer(http.FS(static))))
 	http.HandleFunc(prefix+"/", Index)
 	http.HandleFunc(prefix, redirect)
 	http.HandleFunc("/", redirect)
@@ -71,7 +83,7 @@ func main() {
 	http.HandleFunc(prefix+"/Admin", Admin)
 
 	println("http://localhost:10025" + prefix)
-	err := http.ListenAndServe(":10025", nil)
+	err = http.ListenAndServe(":10025", nil)
 	if err != nil {
 		println(err.Error())
 	}
