@@ -11,6 +11,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/motaz/codeutils"
 )
 
 var AdvancedTabs1 = []TabType{
@@ -30,6 +32,7 @@ var AdvancedTabs2 = []TabType{
 }
 
 func GetAdvancedHeader(User UserType, page, page2 string, r *http.Request) (Data HeaderType) {
+
 	Data = GetHeader(User, "Advanced", r)
 	AdvTabs := AdvancedTabs1
 	if User.Admin {
@@ -55,6 +58,7 @@ func GetAdvancedHeader(User UserType, page, page2 string, r *http.Request) (Data
 			Tabs: []TabType{
 				{Value: "?file=asterisk.conf", Name: "asterisk.conf"},
 				{Value: "?file=sip.conf", Name: "sip.conf"},
+				{Value: "?file=pjsip.conf", Name: "pjsip.conf"},
 				{Value: "?file=extensions.conf", Name: "extensions.conf"},
 				{Value: "?file=queues.conf", Name: "queues.conf"},
 				{Value: "?file=agents.conf", Name: "agents.conf"},
@@ -167,6 +171,7 @@ type FilesType struct {
 }
 
 func Files(w http.ResponseWriter, r *http.Request) {
+
 	exist, User := CheckSession(r)
 	pbxname := GetCookieValue(r, "file")
 	pbx := GetPBXDir() + pbxname
@@ -390,7 +395,7 @@ func EditFile(w http.ResponseWriter, r *http.Request) {
 						Data.Message = "File Saved"
 						Data.MessageType = "infomessage"
 					} else {
-						Data.Message = "Error: " + err.Error()
+						Data.Message = "Error: " + res.Message
 						Data.MessageType = "errormessage"
 					}
 				} else {
@@ -811,6 +816,10 @@ func Logs(w http.ResponseWriter, r *http.Request) {
 					fileName = "/var/log/asterisk/full"
 
 				}
+				if !codeutils.IsFileExists(fileName) {
+					fileName += ".log"
+				}
+
 				co := &http.Cookie{Name: "logsize", Value: linesStr}
 				http.SetCookie(w, co)
 

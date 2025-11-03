@@ -678,6 +678,7 @@ type UsageLineType struct {
 }
 
 type SystemStatusType struct {
+	HostName  string
 	Percent   string
 	BGColor   string
 	Time      string
@@ -686,9 +687,23 @@ type SystemStatusType struct {
 	TopProc   []string
 	Memory    string
 	Lines     []UsageLineType
+	OS        string
 }
 
 func GetSystemStatus(url string) (System SystemStatusType, err error) {
+
+	result, _ := executeShell("hostname", url)
+	System.HostName = result.Result
+
+	result, err = executeShell("hostnamectl", url)
+	if err == nil && result.Result != "" {
+		lines := strings.Split(result.Result, "\n")
+		for _, line := range lines {
+			if strings.Contains(line, "Operating System") {
+				System.OS = line[strings.Index(line, ":")+1:]
+			}
+		}
+	}
 
 	// CPU Utilization
 	var res ResponseType
