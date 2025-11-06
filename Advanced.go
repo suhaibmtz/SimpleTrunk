@@ -31,6 +31,20 @@ var AdvancedTabs2 = []TabType{
 	{Value: "Config", Name: "Configuration"},
 }
 
+func GetSelectedPBX(r *http.Request) string {
+
+	pbxname := GetCookieValue(r, "file")
+	pbx := GetPBXDir() + pbxname
+	return pbx
+}
+
+func GetSIPProtocol(r *http.Request) string {
+
+	pbx := GetSelectedPBX(r)
+	sip := GetConfigValueFrom(pbx, "protocol", "sip")
+	return sip
+}
+
 func GetAdvancedHeader(User UserType, page, page2 string, r *http.Request) (Data HeaderType) {
 
 	Data = GetHeader(User, "Advanced", r)
@@ -40,6 +54,9 @@ func GetAdvancedHeader(User UserType, page, page2 string, r *http.Request) (Data
 	}
 	AdvTabs = append(AdvTabs, AdvancedTabs2...)
 	AdvancedTabs := TabsType{Selected: page, Tabs: AdvTabs}
+
+	sip := GetSIPProtocol(r)
+
 	var Tabs TabsType
 	switch page {
 	case "Status":
@@ -57,8 +74,7 @@ func GetAdvancedHeader(User UserType, page, page2 string, r *http.Request) (Data
 		Tabs = TabsType{Selected: page2, Text: "Files",
 			Tabs: []TabType{
 				{Value: "?file=asterisk.conf", Name: "asterisk.conf"},
-				{Value: "?file=sip.conf", Name: "sip.conf"},
-				{Value: "?file=pjsip.conf", Name: "pjsip.conf"},
+				{Value: "?file=" + sip + ".conf", Name: sip + ".conf"},
 				{Value: "?file=extensions.conf", Name: "extensions.conf"},
 				{Value: "?file=queues.conf", Name: "queues.conf"},
 				{Value: "?file=agents.conf", Name: "agents.conf"},
@@ -111,9 +127,12 @@ type StatusType struct {
 }
 
 func Status(w http.ResponseWriter, r *http.Request) {
+
 	exist, User := CheckSession(r)
 	pbxname := GetCookieValue(r, "file")
 	pbx := GetPBXDir() + pbxname
+	sip := GetSIPProtocol(r)
+
 	if exist {
 		if FileExist(pbx) && pbxname != "" {
 			var Data StatusType
@@ -123,7 +142,11 @@ func Status(w http.ResponseWriter, r *http.Request) {
 			case "channels":
 				commandLine = "core show channels verbose"
 			case "peers":
-				commandLine = "sip show peers"
+				if sip == "sip" {
+					commandLine = "sip show peers"
+				} else {
+					commandLine = "pjsip show endpoints"
+				}
 			case "users":
 				commandLine = "sip show users"
 			case "codecs":

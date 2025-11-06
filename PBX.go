@@ -832,6 +832,7 @@ func GetActiveChannels(pbxfile string) (Calls ActiveChannelsType, message string
 }
 
 func Monitor(w http.ResponseWriter, r *http.Request) {
+
 	exist, User := CheckSession(r)
 	if exist {
 		pbxname := GetCookieValue(r, "file")
