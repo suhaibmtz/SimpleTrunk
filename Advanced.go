@@ -148,7 +148,11 @@ func Status(w http.ResponseWriter, r *http.Request) {
 					commandLine = "pjsip show endpoints"
 				}
 			case "users":
-				commandLine = "sip show users"
+				if sip == "sip" {
+					commandLine = "sip show users"
+				} else {
+					commandLine = "pjsip show aors"
+				}
 			case "codecs":
 				commandLine = "core show codecs"
 			case "stats":
@@ -440,14 +444,17 @@ func EditFile(w http.ResponseWriter, r *http.Request) {
 
 type SipNodesType struct {
 	HeaderType
+	Sip   string
 	Nodes []string
 }
 
 func SIPNodes(w http.ResponseWriter, r *http.Request) {
+
 	exist, User := CheckSession(r)
 	if exist {
 		pbx := GetCookieValue(r, "file")
 		pbxfile := GetPBXDir() + pbx
+
 		if FileExist(pbxfile) && pbx != "" {
 			var Data SipNodesType
 			Data.HeaderType = GetAdvancedHeader(User, "SIP", "", r)
@@ -457,8 +464,10 @@ func SIPNodes(w http.ResponseWriter, r *http.Request) {
 					AgentUrl += "/"
 				}
 			}
+			sip := GetSIPProtocol(r)
 
-			Res, err := GetFile(AgentUrl, "sip.conf")
+			Res, err := GetFile(AgentUrl, sip+".conf")
+			Data.Sip = sip
 			if err != nil {
 				Data.Message = "Error: " + err.Error()
 				Data.MessageType = "errormessage"
@@ -500,6 +509,7 @@ type EditNodeType struct {
 }
 
 func EditNode(w http.ResponseWriter, r *http.Request) {
+
 	exist, User := CheckSession(r)
 	if exist {
 		tabName := "SIP"
@@ -629,7 +639,9 @@ type CommandsType struct {
 }
 
 func Commands(w http.ResponseWriter, r *http.Request) {
+
 	exist, User := CheckSession(r)
+	sip := GetSIPProtocol(r)
 	if exist {
 		pbx := GetCookieValue(r, "file")
 		pbxfile := GetPBXDir() + pbx
@@ -651,11 +663,11 @@ func Commands(w http.ResponseWriter, r *http.Request) {
 					commandLine = "core reload"
 					selected = "core reload"
 				case "sipreload":
-					commandLine = "sip reload"
-					selected = "sip reload"
+					commandLine = sip + " reload"
+					selected = commandLine
 				case "dialplanreload":
 					commandLine = "dialplan reload"
-					selected = "dialplan reload"
+					selected = commandLine
 				case "version":
 					commandLine = "core show version"
 				case "help":

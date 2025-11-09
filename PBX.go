@@ -68,6 +68,7 @@ type ExtensionsType struct {
 	Title      string
 	Pre        string
 	File       string
+	SipType    string
 }
 
 func GetExtensionNode(node NodeInfoType) (Extension ExtensionNodeType) {
@@ -110,11 +111,12 @@ func GetExtensions(Aurl, fileName string, r *http.Request, title string, isExten
 }
 
 func doAddNode(r *http.Request, Aurl string, Data *ExtensionsType) (pre string, err error) {
+
 	if r.FormValue("addnode") != "" {
 		saveobj := make(map[string]string)
 		fileName := r.FormValue("file")
 		if fileName == "" {
-			fileName = "sip.conf"
+			fileName = GetSIPProtocol(r) + ".conf"
 		}
 		saveobj["filename"] = fileName
 		nodeName := "[" + r.FormValue("nodename") + "]"
@@ -154,6 +156,7 @@ func doAddNode(r *http.Request, Aurl string, Data *ExtensionsType) (pre string, 
 }
 
 func Extensions(w http.ResponseWriter, r *http.Request) {
+
 	exist, User := CheckSession(r)
 	if exist {
 		pbxname := GetCookieValue(r, "file")
@@ -179,8 +182,9 @@ func Extensions(w http.ResponseWriter, r *http.Request) {
 			}
 			Data.HeaderType = GetPBXHeader(User, page, "", r)
 			Data.FileName = r.FormValue("file")
+			sip := GetSIPProtocol(r)
 			if Data.FileName == "" {
-				Data.FileName = "sip.conf"
+				Data.FileName = sip + ".conf"
 			}
 			var err error
 			if User.Admin {
@@ -189,11 +193,19 @@ func Extensions(w http.ResponseWriter, r *http.Request) {
 					Data.ErrorMessage(err.Error())
 				}
 			}
+
 			Data.Nodes, err = GetExtensions(AgentUrl, Data.FileName, r, Data.Title, Data.IsExten, page)
 			if err != nil {
 				Data.ErrorMessage(err.Error())
 			}
 			Data.DisplayAdd = r.FormValue("add") != "" && User.Admin
+			if Data.DisplayAdd {
+				if sip == "sip" {
+					Data.SipType = "friend"
+				} else {
+					Data.SipType = "endpoint"
+				}
+			}
 			err = mytemplate.ExecuteTemplate(w, "Extensions.html", Data)
 			if err != nil {
 				WriteLog("Error in Extensions execute template: " + err.Error())

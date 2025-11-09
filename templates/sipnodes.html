@@ -7,9 +7,10 @@
 Add new SIP node</a>
 {{end}}
 <table class=dtable><tr><th>Node</th><th></th></tr>
+{{ $sip := .Sip}}
 {{ range .Nodes}}
 <tr>
-<td><a href='EditNode?filename=sip.conf&nodename={{.}}'>[{{.}}]</a></td>
+<td><a href='EditNode?filename={{$sip}}.conf&nodename={{.}}'>[{{.}}]</a></td>
 </tr>
 {{end}}
 </table>

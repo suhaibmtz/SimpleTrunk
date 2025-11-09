@@ -12,7 +12,7 @@ import (
 var mytemplate *template.Template
 var PREFIX string
 
-const Version = "1.2.4 30Oct"
+const Version = "1.2.6 9Nov"
 
 //go:embed static
 var static embed.FS
@@ -85,10 +85,12 @@ func main() {
 	println("http://localhost:10025" + prefix)
 	err = http.ListenAndServe(":10025", nil)
 	if err != nil {
-		println(err.Error())
+		WriteLog("Error while starting: " + err.Error())
+		fmt.Println(err.Error())
 	}
 }
 
 func redirect(w http.ResponseWriter, r *http.Request) {
+
 	http.Redirect(w, r, PREFIX+"/", http.StatusTemporaryRedirect)
 }
