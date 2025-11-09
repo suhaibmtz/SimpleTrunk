@@ -11,6 +11,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/motaz/codeutils"
 )
 
 var AdvancedTabs1 = []TabType{
@@ -29,7 +31,22 @@ var AdvancedTabs2 = []TabType{
 	{Value: "Config", Name: "Configuration"},
 }
 
+func GetSelectedPBX(r *http.Request) string {
+
+	pbxname := GetCookieValue(r, "file")
+	pbx := GetPBXDir() + pbxname
+	return pbx
+}
+
+func GetSIPProtocol(r *http.Request) string {
+
+	pbx := GetSelectedPBX(r)
+	sip := GetConfigValueFrom(pbx, "protocol", "sip")
+	return sip
+}
+
 func GetAdvancedHeader(User UserType, page, page2 string, r *http.Request) (Data HeaderType) {
+
 	Data = GetHeader(User, "Advanced", r)
 	AdvTabs := AdvancedTabs1
 	if User.Admin {
@@ -37,6 +54,9 @@ func GetAdvancedHeader(User UserType, page, page2 string, r *http.Request) (Data
 	}
 	AdvTabs = append(AdvTabs, AdvancedTabs2...)
 	AdvancedTabs := TabsType{Selected: page, Tabs: AdvTabs}
+
+	sip := GetSIPProtocol(r)
+
 	var Tabs TabsType
 	switch page {
 	case "Status":
@@ -54,7 +74,7 @@ func GetAdvancedHeader(User UserType, page, page2 string, r *http.Request) (Data
 		Tabs = TabsType{Selected: page2, Text: "Files",
 			Tabs: []TabType{
 				{Value: "?file=asterisk.conf", Name: "asterisk.conf"},
-				{Value: "?file=sip.conf", Name: "sip.conf"},
+				{Value: "?file=" + sip + ".conf", Name: sip + ".conf"},
 				{Value: "?file=extensions.conf", Name: "extensions.conf"},
 				{Value: "?file=queues.conf", Name: "queues.conf"},
 				{Value: "?file=agents.conf", Name: "agents.conf"},
@@ -107,9 +127,12 @@ type StatusType struct {
 }
 
 func Status(w http.ResponseWriter, r *http.Request) {
+
 	exist, User := CheckSession(r)
 	pbxname := GetCookieValue(r, "file")
 	pbx := GetPBXDir() + pbxname
+	sip := GetSIPProtocol(r)
+
 	if exist {
 		if FileExist(pbx) && pbxname != "" {
 			var Data StatusType
@@ -119,9 +142,17 @@ func Status(w http.ResponseWriter, r *http.Request) {
 			case "channels":
 				commandLine = "core show channels verbose"
 			case "peers":
-				commandLine = "sip show peers"
+				if sip == "sip" {
+					commandLine = "sip show peers"
+				} else {
+					commandLine = "pjsip show endpoints"
+				}
 			case "users":
-				commandLine = "sip show users"
+				if sip == "sip" {
+					commandLine = "sip show users"
+				} else {
+					commandLine = "pjsip show aors"
+				}
 			case "codecs":
 				commandLine = "core show codecs"
 			case "stats":
@@ -167,6 +198,7 @@ type FilesType struct {
 }
 
 func Files(w http.ResponseWriter, r *http.Request) {
+
 	exist, User := CheckSession(r)
 	pbxname := GetCookieValue(r, "file")
 	pbx := GetPBXDir() + pbxname
@@ -390,7 +422,7 @@ func EditFile(w http.ResponseWriter, r *http.Request) {
 						Data.Message = "File Saved"
 						Data.MessageType = "infomessage"
 					} else {
-						Data.Message = "Error: " + err.Error()
+						Data.Message = "Error: " + res.Message
 						Data.MessageType = "errormessage"
 					}
 				} else {
@@ -412,14 +444,17 @@ func EditFile(w http.ResponseWriter, r *http.Request) {
 
 type SipNodesType struct {
 	HeaderType
+	Sip   string
 	Nodes []string
 }
 
 func SIPNodes(w http.ResponseWriter, r *http.Request) {
+
 	exist, User := CheckSession(r)
 	if exist {
 		pbx := GetCookieValue(r, "file")
 		pbxfile := GetPBXDir() + pbx
+
 		if FileExist(pbxfile) && pbx != "" {
 			var Data SipNodesType
 			Data.HeaderType = GetAdvancedHeader(User, "SIP", "", r)
@@ -429,8 +464,10 @@ func SIPNodes(w http.ResponseWriter, r *http.Request) {
 					AgentUrl += "/"
 				}
 			}
+			sip := GetSIPProtocol(r)
 
-			Res, err := GetFile(AgentUrl, "sip.conf")
+			Res, err := GetFile(AgentUrl, sip+".conf")
+			Data.Sip = sip
 			if err != nil {
 				Data.Message = "Error: " + err.Error()
 				Data.MessageType = "errormessage"
@@ -472,6 +509,7 @@ type EditNodeType struct {
 }
 
 func EditNode(w http.ResponseWriter, r *http.Request) {
+
 	exist, User := CheckSession(r)
 	if exist {
 		tabName := "SIP"
@@ -601,7 +639,9 @@ type CommandsType struct {
 }
 
 func Commands(w http.ResponseWriter, r *http.Request) {
+
 	exist, User := CheckSession(r)
+	sip := GetSIPProtocol(r)
 	if exist {
 		pbx := GetCookieValue(r, "file")
 		pbxfile := GetPBXDir() + pbx
@@ -623,11 +663,11 @@ func Commands(w http.ResponseWriter, r *http.Request) {
 					commandLine = "core reload"
 					selected = "core reload"
 				case "sipreload":
-					commandLine = "sip reload"
-					selected = "sip reload"
+					commandLine = sip + " reload"
+					selected = commandLine
 				case "dialplanreload":
 					commandLine = "dialplan reload"
-					selected = "dialplan reload"
+					selected = commandLine
 				case "version":
 					commandLine = "core show version"
 				case "help":
@@ -811,6 +851,10 @@ func Logs(w http.ResponseWriter, r *http.Request) {
 					fileName = "/var/log/asterisk/full"
 
 				}
+				if !codeutils.IsFileExists(fileName) {
+					fileName += ".log"
+				}
+
 				co := &http.Cookie{Name: "logsize", Value: linesStr}
 				http.SetCookie(w, co)
 

@@ -167,6 +167,7 @@ type PBXType struct {
 	AMIPass      string
 	Submit       string
 	RemoteConfig string
+	Protocol     string
 }
 
 func getPBXData(r *http.Request, Data *PBXType) {
@@ -177,12 +178,14 @@ func getPBXData(r *http.Request, Data *PBXType) {
 	Data.AMIUser = r.FormValue("amiuser")
 	Data.AMIPass = r.FormValue("amipass")
 	Data.RemoteConfig = r.FormValue("remoteconfig")
+	Data.Protocol = r.FormValue("protocol")
 	if Data.Count == 0 {
 		Data.Count = len(GetPBXFiles()) + 1
 	}
 }
 
 func getPBXDefualt(Data *PBXType) {
+
 	if Data.AMIUser == "" {
 		Data.AMIUser = "admin"
 	}
@@ -201,6 +204,7 @@ func PBXEmpty(Data *PBXType) (empty bool) {
 }
 
 func AddPBX(w http.ResponseWriter, r *http.Request) {
+
 	exist, User := CheckSession(r)
 	if exist {
 		if User.Admin {
@@ -233,6 +237,7 @@ func AddPBX(w http.ResponseWriter, r *http.Request) {
 }
 
 func EditPBX(w http.ResponseWriter, r *http.Request) {
+
 	exist, User := CheckSession(r)
 	if exist {
 		if User.Admin {
@@ -285,6 +290,7 @@ func EditPBX(w http.ResponseWriter, r *http.Request) {
 					Data.Count, _ = strconv.Atoi(GetConfigValueFrom(pbxFile, "index", r.FormValue("index")))
 					Data.Title = GetConfigValueFrom(pbxFile, "title", r.FormValue("title"))
 					Data.File = r.FormValue("file")
+					Data.Protocol = GetConfigValueFrom(pbxFile, "protocol", "sip")
 					if Data.File == "" {
 						Data.File = pbx
 					}

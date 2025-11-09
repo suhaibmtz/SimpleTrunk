@@ -20,6 +20,7 @@ func WriteLog(event string) {
 }
 
 func GetConfigValueFrom(file, param, def string) (value string) {
+
 	CheckFolder()
 	value = codeutils.GetConfigValue(file, param)
 
@@ -30,8 +31,8 @@ func GetConfigValueFrom(file, param, def string) (value string) {
 }
 
 func SetConfigValueTo(file, param, value string) (success bool) {
-	CheckFolder()
 
+	CheckFolder()
 	success = codeutils.SetConfigValue(file, param, value)
 	return
 }
@@ -58,6 +59,7 @@ type GetFileResponseType struct {
 }
 
 func RemoveColons() {
+
 	Files := GetPBXFilesInfo()
 	dir := GetPBXDir()
 	for _, f := range Files {
@@ -74,6 +76,7 @@ func RemoveColons() {
 }
 
 func restCallURL(url string, data []byte) (value []byte, err error) {
+
 	var res *http.Response
 	url = strings.TrimSpace(url)
 	if data == nil {
@@ -93,6 +96,7 @@ func restCallURL(url string, data []byte) (value []byte, err error) {
 }
 
 func GetCookieValue(r *http.Request, cookie string) (Value string) {
+
 	coo, err := r.Cookie(cookie)
 	if err == nil {
 		Value = coo.Value

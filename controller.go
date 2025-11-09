@@ -279,6 +279,7 @@ func GetRemoteFile(url string) (text string, err error) {
 }
 
 func SavePbx(Data *PBXType, old string) (success bool) {
+
 	CheckFolder()
 	edit := old == Data.File
 	if old != Data.File {
@@ -303,8 +304,10 @@ func SavePbx(Data *PBXType, old string) (success bool) {
 		if success {
 			SetConfigValueTo(file, "index", fmt.Sprint(Data.Count))
 			success = SetConfigValueTo(file, "title", Data.Title)
+			SetConfigValueTo(file, "protocol", Data.Protocol)
 			SetConfigValueTo(file, "amiuser", Data.AMIUser)
 			SetConfigValueTo(file, "amipass", Data.AMIPass)
+
 		} else {
 			Data.Message = "Unable to write configuration"
 			Data.MessageType = "errormessage"
@@ -778,6 +781,7 @@ func GetNodeContent(fileName, AgentUrl, nodename string) (content, message strin
 }
 
 func SaveNode(r *http.Request, fileName, nodename, url string) (res ResponseType, err error) {
+
 	if r.FormValue("save") != "" {
 		saveobj := make(map[string]string)
 		saveobj["filename"] = fileName

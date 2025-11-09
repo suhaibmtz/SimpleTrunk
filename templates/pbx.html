@@ -25,6 +25,25 @@ value={{.File}}
 value='{{.AMIPass}}'
 {{end}}
 /></td></tr>
+
+<tr>
+<td>
+<label for="sip-protocol">Protocol:</label>
+</td>
+<td>
+
+<select name="protocol" id="sip-protocol">
+  <option value="sip" {{if eq .Protocol "sip"}}selected{{end}}>
+    sip
+  </option>
+  <option value="pjsip" {{if eq .Protocol "pjsip"}}selected{{end}}>
+    pjsip
+  </option>
+</select>
+
+</td>
+</tr>
+
 {{ if ne .RemoteConfig "" }}
 <tr>
 <td>Remote STAgent config</td>

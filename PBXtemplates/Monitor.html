@@ -34,18 +34,36 @@
 {{end}}
 <!--system-->
 {{ define "system" }}
+
+<h3>Server Info</h3>
+
 <table class=dtable><tr>
+<tr>
+  <td>Host name</td>  <td><b>{{.HostName}}</b></td>
+</tr>
+
 <td>CPU Usage</td>
-<td bgcolor="{{.BGColor}}">{{.Percent}} %</td></tr>
-</table><br/>
-<h3>Server time</h3>
-<pre>{{.Time}}</pre>
+  <td bgcolor="{{.BGColor}}"><b>{{.Percent}}</b> %</td>
+</tr>
+<tr>
+  <td>Server time  </td>  <td><b>{{.Time}}</b></td>
+</tr>
+
+<tr>
+  <td>Processors core </td>  <td><b>{{.ProcCount}}</b></td>
+</tr>
+
+<tr>
+  <td>IPs </td>  <td><b>{{.IP}}</b></td>
+</tr>
+
+<tr>
+  <td>OS </td>  <td><b>{{.OS}}</b></td>
+</tr>
+
+</table>
 <br/>
-<h3>Processor cores count</h3>
-<pre>{{.ProcCount}}</pre>
-<br/>
-<h3>IPs</h3>
-<pre>{{.IP}}</pre><br/>
+
 <h3>Top Processes</h3>
 <pre>{{range .TopProc}}
 {{.}}{{end}}</pre><br/>
